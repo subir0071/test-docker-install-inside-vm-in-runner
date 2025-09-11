@@ -2,19 +2,34 @@
 
 ## Executive Summary
 
-After extensive investigation, we have identified that **GitHub-hosted runners have architectural limitations that prevent nested virtual machines from establishing outbound network connections**. This is not a configuration issue but a fundamental infrastructure constraint.
+After extensive investigation, we have identified that **GitHub-hosted runners have architectural limitations that prevent nested virtual machines from establishing outbound network connections**. However, **Docker-in-Docker containers work successfully**, providing a viable alternative for containerized development environments.
+
+## 🎉 **BREAKTHROUGH**: Docker-in-Docker Solution Confirmed
+
+**Workflow Results**: [Docker-in-Docker test completed successfully](https://github.com/josecelano/test-docker-install-inside-vm-in-runner/actions/runs/17651858372/job/50164731103)
+
+### ✅ **What Works**: Docker-in-Docker
+- **✅ Container creation**: Ubuntu 24.04 + Docker CE built successfully
+- **✅ Network connectivity**: Full outbound network access from inside container
+- **✅ Package manager**: APT operations work without issues
+- **✅ Docker operations**: Pull, run, build containers inside DinD
+- **✅ Docker Hub access**: Direct connectivity to Docker registry
+- **✅ Advanced features**: Building images inside Docker-in-Docker
+
+### ❌ **What Doesn't Work**: Virtual Machines (LXD)
+- **❌ VMs fail**: All outbound connections timeout despite proper IP configuration
+- **❌ Network isolation**: Azure/GitHub policies block VM traffic patterns
+- **❌ Package installation**: Cannot reach repositories from inside VMs
 
 ## Root Cause Analysis
 
 ### Infrastructure Design
-
 - **GitHub runners are hosted in Azure datacenters**
 - **Network policies are designed for runner processes, not nested VMs**
-- **Security groups and firewall rules expect specific traffic patterns**
-- **Communication requirements are defined for runner-to-service connections**
+- **Container traffic is allowed**, but **VM traffic is blocked**
+- **Security groups treat containers and VMs differently**
 
 ### Evidence from GitHub Documentation
-
 Based on [GitHub's official runner documentation](https://docs.github.com/en/actions/reference/runners/github-hosted-runners):
 
 1. **Nested virtualization limitations**: Explicitly mentioned for macOS arm64 runners
@@ -23,11 +38,10 @@ Based on [GitHub's official runner documentation](https://docs.github.com/en/act
 4. **Azure infrastructure constraints**: Windows/Ubuntu runners hosted in Azure with managed networking
 
 ### Technical Symptoms Analysis
-
-| Symptom                     | Why It Occurs                                   | Implications                                |
-| --------------------------- | ----------------------------------------------- | ------------------------------------------- |
-| ✅ VMs get IPv4 addresses   | LXD bridge networking works locally             | Local networking functions within runner    |
-| ✅ DNS resolution works     | DNS queries likely proxied at runner level      | Some network services are handled by runner |
+| Approach | Network Connectivity | Docker Operations | Package Manager | Status |
+|----------|---------------------|-------------------|-----------------|--------|
+| **VMs (LXD)** | ❌ All connections timeout | ❌ Cannot pull images | ❌ APT fails | **BLOCKED** |
+| **Containers (DinD)** | ✅ Full connectivity | ✅ All operations work | ✅ APT works | **SUCCESS** |
 | ❌ HTTP connections timeout | Direct routing blocked by Azure/GitHub policies | Outbound connections not permitted from VMs |
 | ❌ Package manager failures | APT/YUM traffic doesn't match expected patterns | Software installation impossible            |
 
