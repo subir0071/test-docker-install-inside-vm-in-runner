@@ -1,5 +1,19 @@
 # VM Network Connectivity Issues on GitHub Shared Runners
 
+## Workflow Status
+
+### ✅ Working Solutions
+
+[![Test Docker-in-Docker](https://github.com/josecelano/test-docker-install-inside-vm-in-runner/actions/workflows/test-docker-in-docker.yml/badge.svg)](https://github.com/josecelano/test-docker-install-inside-vm-in-runner/actions/workflows/test-docker-in-docker.yml) [![Test Docker Runtime Install](https://github.com/josecelano/test-docker-install-inside-vm-in-runner/actions/workflows/test-docker-runtime-install.yml/badge.svg)](https://github.com/josecelano/test-docker-install-inside-vm-in-runner/actions/workflows/test-docker-runtime-install.yml)
+
+### 🔍 Investigation Tests
+
+[![Test Docker IPv4 Fix](https://github.com/josecelano/test-docker-install-inside-vm-in-runner/actions/workflows/test-docker-ipv4-fix.yml/badge.svg)](https://github.com/josecelano/test-docker-install-inside-vm-in-runner/actions/workflows/test-docker-ipv4-fix.yml) [![Test Docker Standard APT](https://github.com/josecelano/test-docker-install-inside-vm-in-runner/actions/workflows/test-docker-standard-apt.yml/badge.svg)](https://github.com/josecelano/test-docker-install-inside-vm-in-runner/actions/workflows/test-docker-standard-apt.yml)
+
+### 📊 Baseline & Control Tests
+
+[![Test Ping Limitation](https://github.com/josecelano/test-docker-install-inside-vm-in-runner/actions/workflows/test-ping-limitation.yml/badge.svg)](https://github.com/josecelano/test-docker-install-inside-vm-in-runner/actions/workflows/test-ping-limitation.yml) [![Test Runner Connectivity](https://github.com/josecelano/test-docker-install-inside-vm-in-runner/actions/workflows/test-runner-connectivity.yml/badge.svg)](https://github.com/josecelano/test-docker-install-inside-vm-in-runner/actions/workflows/test-runner-connectivity.yml)
+
 ## 🎉 **SOLUTION FOUND**: Docker-in-Docker Alternative
 
 **Status**: ✅ **SOLVED** - Docker-in-Docker provides full functionality without network restrictions!
