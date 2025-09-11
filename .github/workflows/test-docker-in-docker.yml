@@ -49,65 +49,8 @@ jobs:
       - name: Build Docker-in-Docker image
         run: |
           echo "=== Building Ubuntu 24.04 + Docker image ==="
-          cat > Dockerfile.dind << 'EOF'
-          FROM ubuntu:24.04
-
-          # Install prerequisites
-          RUN apt-get update && apt-get install -y \
-              ca-certificates \
-              curl \
-              gnupg \
-              lsb-release \
-              iptables \
-              supervisor \
-              && rm -rf /var/lib/apt/lists/*
-
-          # Add Docker's official GPG key
-          RUN install -m 0755 -d /etc/apt/keyrings && \
-              curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc && \
-              chmod a+r /etc/apt/keyrings/docker.asc
-
-          # Add Docker repository
-          RUN echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | \
-              tee /etc/apt/sources.list.d/docker.list > /dev/null
-
-          # Install Docker
-          RUN apt-get update && apt-get install -y \
-              docker-ce \
-              docker-ce-cli \
-              containerd.io \
-              docker-buildx-plugin \
-              docker-compose-plugin \
-              && rm -rf /var/lib/apt/lists/*
-
-          # Create supervisord config for Docker daemon
-          RUN mkdir -p /var/log/supervisor
-          COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
-
-          # Expose Docker daemon port
-          EXPOSE 2376
-
-          # Start supervisord
-          CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
-          EOF
-
-          # Create supervisord configuration
-          cat > supervisord.conf << 'EOF'
-          [supervisord]
-          nodaemon=true
-          user=root
-          logfile=/var/log/supervisor/supervisord.log
-          pidfile=/var/run/supervisord.pid
-
-          [program:dockerd]
-          command=dockerd --host=unix:///var/run/docker.sock --host=tcp://0.0.0.0:2376
-          stdout_logfile=/var/log/supervisor/dockerd.log
-          stderr_logfile=/var/log/supervisor/dockerd.log
-          autorestart=true
-          EOF
-
-          echo "--- Building the Docker-in-Docker image ---"
-          docker build -f Dockerfile.dind -t ubuntu-dind:24.04 .
+          echo "--- Building from docker/Dockerfile.dind ---"
+          docker build -f docker/Dockerfile.dind -t ubuntu-dind:24.04 docker/
 
       - name: Test basic container functionality
         run: |
