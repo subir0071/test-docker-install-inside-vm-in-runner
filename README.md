@@ -92,6 +92,45 @@ GitHub shared runners are known to have networking issues that can cause flaky b
   - Pre-cached dependency installation
   - Docker convenience script installation
 
+## Summary of Findings: Direct Runner vs VM Environment
+
+Our comprehensive testing has revealed significant differences between running operations directly on GitHub shared runners versus inside VMs created within those runners (double virtualization):
+
+| Operation/Feature | Direct GitHub Runner | VM Inside Runner (LXD) | Status |
+|------------------|---------------------|------------------------|---------|
+| **Network Operations** | | | |
+| Package manager (`apt-get update`) | ✅ Works perfectly | ❌ Fails with timeouts | **VM-specific issue** |
+| External repository access | ✅ Works (Docker, Microsoft repos) | ❌ Connection timeouts | **VM-specific issue** |
+| HTTP connectivity | ✅ Fast (0-4s responses) | ❌ Slow/timeout | **VM-specific issue** |
+| HTTPS connectivity | ✅ Fast (0-4s responses) | ❌ Slow/timeout | **VM-specific issue** |
+| DNS resolution | ✅ Works correctly | ✅ Works correctly | **Both work** |
+| **Docker Operations** | | | |
+| Docker Hub connectivity | ✅ Works perfectly | ❌ Registry timeouts | **VM-specific issue** |
+| Container pulls | ✅ Fast downloads | ❌ Network failures | **VM-specific issue** |
+| Docker daemon | ✅ Pre-installed & working | ❌ Installation fails | **VM-specific issue** |
+| **Platform Limitations** | | | |
+| ICMP/Ping support | ❌ Blocked (Azure design) | ❌ Blocked (Azure design) | **Both blocked** |
+| Ping timeout behavior | 12-14s timeouts | 12-14s timeouts | **Same limitation** |
+| **Performance** | | | |
+| Network latency | Fast (0-4s) | Slow/timeout (30s+) | **VM degrades performance** |
+| Package installation | Fast | Fails due to network | **VM blocks operations** |
+| Resource usage | Direct access | Nested virtualization overhead | **VM adds overhead** |
+
+### Key Insights
+
+- **✅ Direct runners work perfectly**: All network operations, Docker functionality, and package management work as expected
+- **❌ VM environments fail consistently**: Network connectivity issues prevent most operations from completing
+- **🔍 Root cause confirmed**: Issues are specific to nested virtualization (LXD VMs), not GitHub runner infrastructure
+- **🎯 Solution focus**: Fix VM networking configuration, not runner-level workarounds
+
+### Test Evidence
+
+| Test Type | Workflow | Results | Documentation |
+|-----------|----------|---------|---------------|
+| Direct Runner Control | `test-runner-connectivity.yml` | ✅ ALL PASSED | [Run #17649598526](https://github.com/josecelano/test-docker-install-inside-vm-in-runner/actions/runs/17649598526/job/50156726426) |
+| VM Environment Baseline | `test-docker-standard-apt.yml` | ❌ Network failures | [Documented issues](docs/network-connectivity-issues.md) |
+| Platform Limitation | `test-ping-limitation.yml` | ✅ Confirmed ICMP blocking | [Run #17649572799](https://github.com/josecelano/test-docker-install-inside-vm-in-runner/actions/runs/17649572799/job/50156646312) |
+
 ## Documented Issues
 
 We have documented specific network connectivity failures in VM environments:
