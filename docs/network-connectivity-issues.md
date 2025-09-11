@@ -4,16 +4,35 @@
 
 This document captures specific network connectivity issues encountered when running Docker installations inside virtual machines on GitHub shared runners, and compares them with direct runner connectivity tests.
 
+## Platform Limitations
+
+### ICMP/Ping Blocking
+
+**Issue**: GitHub shared runners (hosted on Azure) do not support ICMP packets by design.
+
+**Impact**:
+
+- `ping` commands always fail with 100% packet loss
+- This is NOT a connectivity issue - HTTP/HTTPS traffic works normally
+- Network diagnostics must use HTTP requests instead of ping
+
+**Reference**: [GitHub Actions Issue #1519](https://github.com/actions/runner-images/issues/1519#issuecomment-683790054)
+
+**Solution**: Our testing framework uses `curl` with HTTP/HTTPS requests for connectivity testing instead of ping.
+
 ## Testing Methodology
 
-We use two complementary approaches to isolate the source of network issues:
+We use three complementary approaches to isolate the source of network issues:
 
 1. **VM-based tests** (`test-docker-standard-apt.yml`): Test Docker installation inside LXD VMs
 2. **Direct runner tests** (`test-runner-connectivity.yml`): Test same operations directly on GitHub runner
+3. **Platform limitation tests** (`test-ping-limitation.yml`): Demonstrate known GitHub runner limitations
 
 This comparison helps determine if issues are:
+
 - **VM-specific**: Problems only occur in virtualized environments
 - **Runner-wide**: Problems affect the GitHub runner infrastructure generally
+- **Platform limitations**: Known restrictions of the GitHub runner environment
 
 ## Issue #2: Docker Registry HTTPS Connectivity Timeout
 

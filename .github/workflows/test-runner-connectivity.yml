@@ -55,7 +55,7 @@ jobs:
           curl -s --max-time 5 --head "http://httpbin.org/get" | head -5 || true
           curl -s --max-time 5 --head "https://httpbin.org/get" | head -5 || true
           curl -s --max-time 5 --head "http://archive.ubuntu.com/" | head -5 || true
-          
+
           echo "--- HTTP/HTTPS connectivity tests ---"
           curl -I --connect-timeout 30 --max-time 60 http://archive.ubuntu.com || true
           curl -I --connect-timeout 30 --max-time 60 https://download.docker.com || true
@@ -64,17 +64,17 @@ jobs:
       - name: Test package manager operations
         run: |
           echo "=== Testing Package Manager Operations ==="
-          
+
           echo "--- Current package cache status ---"
           sudo apt list --installed | head -10
-          
+
           echo "--- Testing package list update ---"
           time sudo apt-get update -y || true
-          
+
           echo "--- Testing package installation (small package) ---"
           # Install a small package that's likely not pre-installed
           time sudo apt-get install -y tree || true
-          
+
           echo "--- Testing package installation (development package) ---"
           # Try installing a development package
           time sudo apt-get install -y jq || true
@@ -82,39 +82,39 @@ jobs:
       - name: Test Docker operations (pre-installed)
         run: |
           echo "=== Testing Docker Operations ==="
-          
+
           echo "--- Docker version ---"
           docker --version || true
-          
+
           echo "--- Docker system info ---"
           docker system info || true
-          
+
           echo "--- Test Docker Hub connectivity ---"
           time docker pull hello-world || true
-          
+
           echo "--- Run test container ---"
           docker run --rm hello-world || true
 
       - name: Test alternative package sources
         run: |
           echo "=== Testing Alternative Package Sources ==="
-          
+
           echo "--- Add Microsoft packages repository ---"
           # Test adding an external repository (similar to Docker repo addition)
           curl -sSL https://packages.microsoft.com/keys/microsoft.asc | sudo apt-key add - || true
           echo "deb [arch=amd64,arm64,armhf signed-by=/usr/share/keyrings/microsoft-archive-keyring.gpg] https://packages.microsoft.com/repos/code stable main" | sudo tee /etc/apt/sources.list.d/vscode.list || true
-          
+
           echo "--- Update with new repository ---"
           time sudo apt-get update || true
 
       - name: Network performance tests
         run: |
           echo "=== Network Performance Tests ==="
-          
+
           echo "--- Download speed test (small files) ---"
           time curl -o /tmp/test1.txt https://httpbin.org/bytes/1024 || true
           time curl -o /tmp/test2.txt https://download.docker.com/linux/ubuntu/gpg || true
-          
+
           echo "--- Multiple concurrent connections ---"
           (curl -I --connect-timeout 10 --max-time 30 http://archive.ubuntu.com &
            curl -I --connect-timeout 10 --max-time 30 https://download.docker.com &

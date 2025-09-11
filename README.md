@@ -63,6 +63,8 @@ GitHub shared runners are known to have networking issues that can cause flaky b
 
 - **Baseline test workflow**: Reproduces standard Docker installation failures in VMs
 - **Control test workflow**: Tests network connectivity directly on GitHub runner
+- **Ping limitation discovery**: Confirmed ICMP is blocked in GitHub shared runners (Azure design)
+- **Refactored connectivity tests**: Replaced ping with HTTP-based connectivity testing
 - **Reusable scripts**: Modular components for testing different approaches
 - **Network issue documentation**: Detailed analysis of connectivity failures
 - **Diagnostic tooling**: Comprehensive logging and troubleshooting scripts
@@ -103,12 +105,24 @@ The repository includes two complementary workflows:
 # VM-based test (reproduces Docker installation failures)
 # Workflow: test-docker-standard-apt.yml
 
-# Direct runner test (control test for comparison) 
+# Direct runner test (control test for comparison)
 # Workflow: test-runner-connectivity.yml
 
-# Both run automatically on push/PR, or trigger manually
+# Ping limitation demonstration (shows ICMP blocking)
+# Workflow: test-ping-limitation.yml
+
+# All workflows run automatically on push/PR, or trigger manually
 # View results at: https://github.com/josecelano/test-docker-install-inside-vm-in-runner/actions
 ```
+
+### Important Platform Limitations
+
+**⚠️ ICMP/Ping Limitation**: GitHub shared runners (hosted on Azure) do not support ICMP packets by design. This means:
+
+- `ping` commands will always fail with 100% packet loss
+- This is NOT a connectivity issue - HTTP/HTTPS traffic works normally
+- Our network diagnostics use HTTP requests instead of ping
+- Reference: [GitHub Actions Issue #1519](https://github.com/actions/runner-images/issues/1519#issuecomment-683790054)
 
 ### Understanding the Test Strategy
 
