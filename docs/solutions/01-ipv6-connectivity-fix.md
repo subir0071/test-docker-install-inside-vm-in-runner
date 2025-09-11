@@ -5,6 +5,7 @@
 Our VMs created with LXD inside GitHub shared runners are only getting IPv6 addresses and no IPv4 addresses. This could be the root cause of our network connectivity failures.
 
 **Evidence from our VM status**:
+
 ```
 +---------+---------+------+-----------------------------------------------+-----------------+-----------+
 |  NAME   |  STATE  | IPV4 |                     IPV6                      |      TYPE       | SNAPSHOTS |
@@ -22,6 +23,7 @@ Many external services and package repositories may have limited or problematic 
 ## Research - GitHub Issues Analysis
 
 ### Issue #668: IPv6 on GitHub-hosted runners
+
 **URL**: https://github.com/actions/runner-images/issues/668  
 **Status**: Closed as "wontfix"  
 **Key Findings**:
@@ -34,10 +36,12 @@ Many external services and package repositories may have limited or problematic 
 4. **IPv4 works fine**: `curl -4 https://www.google.com` works normally
 5. **Official response**: "Unfortunately we can't support this at this time due to infrastructure constraints"
 
-### Issue #402: IPv6 on GitHub-hosted runners (Original)  
+### Issue #402: IPv6 on GitHub-hosted runners (Original)
+
 **URL**: https://github.com/actions/runner/issues/402  
 **Status**: Transferred to runner-images#668  
 **Key Technical Details**:
+
 - IPv6 kernel driver is not loaded and cannot be loaded
 - `modprobe ipv6` fails silently
 - This explains why IPv6 connectivity doesn't work
@@ -46,7 +50,7 @@ Many external services and package repositories may have limited or problematic 
 
 1. **Direct runners work**: They have IPv4 connectivity and can reach all services
 2. **VMs fail**: Our LXD VMs are getting IPv6-only addresses in an environment where IPv6 doesn't work
-3. **Network cascade failure**: 
+3. **Network cascade failure**:
    - VM gets IPv6 address only
    - Tries to connect to external services via IPv6
    - GitHub runner environment blocks IPv6 traffic
@@ -76,21 +80,23 @@ We need to configure LXD to give our VMs IPv4 addresses instead of (or in additi
 #### Technical Steps
 
 1. **Configure LXD for IPv4**:
+
    ```bash
    # Option 1: Configure default bridge for IPv4
    lxc network set lxdbr0 ipv4.address 10.0.0.1/24
    lxc network set lxdbr0 ipv4.nat true
    lxc network set lxdbr0 ipv6.address none
-   
+
    # Option 2: Create custom IPv4 bridge
    lxc network create br-ipv4 ipv6.address=none ipv4.address=192.168.100.1/24 ipv4.nat=true
    ```
 
 2. **Launch VM with IPv4 network**:
+
    ```bash
    # Use custom network
    lxc launch ubuntu:24.04 test-vm --network br-ipv4
-   
+
    # Or modify existing profile
    lxc profile device set default eth0 network br-ipv4
    ```
@@ -100,6 +106,7 @@ We need to configure LXD to give our VMs IPv4 addresses instead of (or in additi
 ### Create New Workflow: `test-docker-ipv4-fix.yml`
 
 This workflow will:
+
 1. Configure LXD for IPv4-only networking
 2. Create a VM with IPv4 address
 3. Verify the VM gets an IPv4 address (not IPv6)
@@ -109,7 +116,7 @@ This workflow will:
 ### Success Criteria
 
 - **✅ VM gets IPv4 address**: LXD status shows IPv4 in the table
-- **✅ Network operations work**: Package updates, external repos accessible  
+- **✅ Network operations work**: Package updates, external repos accessible
 - **✅ Docker installation succeeds**: Full Docker installation completes
 - **✅ Container operations work**: Docker pull and run commands work
 
@@ -123,8 +130,9 @@ This workflow will:
 ## Expected Outcome
 
 If this hypothesis is correct, we should see:
+
 - ✅ Fast network responses (0-4s like direct runner)
-- ✅ Successful package installations  
+- ✅ Successful package installations
 - ✅ Working Docker installation
 - ✅ Functional container operations
 
@@ -133,7 +141,7 @@ This would definitively prove that IPv6-only networking was our root cause.
 ## Next Steps
 
 1. **Create IPv4 configuration script** (`scripts/configure-ipv4-networking.sh`)
-2. **Update VM launch script** to use IPv4 networking  
+2. **Update VM launch script** to use IPv4 networking
 3. **Create test workflow** (`test-docker-ipv4-fix.yml`)
 4. **Run comparative tests** vs baseline IPv6-only results
 

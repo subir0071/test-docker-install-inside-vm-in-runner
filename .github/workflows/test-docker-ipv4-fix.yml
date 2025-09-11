@@ -23,19 +23,19 @@ on:
   push:
     branches: [main]
     paths:
-      - '.github/workflows/test-docker-ipv4-fix.yml'
-      - 'scripts/configure-ipv4-networking.sh'
+      - ".github/workflows/test-docker-ipv4-fix.yml"
+      - "scripts/configure-ipv4-networking.sh"
   pull_request:
     branches: [main]
     paths:
-      - '.github/workflows/test-docker-ipv4-fix.yml'
-      - 'scripts/configure-ipv4-networking.sh'
+      - ".github/workflows/test-docker-ipv4-fix.yml"
+      - "scripts/configure-ipv4-networking.sh"
 
 jobs:
   docker-ipv4-fix:
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -50,21 +50,39 @@ jobs:
         run: |
           echo "=== Launching VM with IPv4 networking ==="
           ./scripts/launch-vm.sh
-          
+
           echo "--- Verifying network configuration after launch ---"
           lxc network list
-          echo "--- VM network interfaces ---"
-          sudo lxc exec test-vm -- ip addr show
 
       - name: Wait for VM to be ready
-        run: ./scripts/wait-for-vm.sh
+        run: |
+          echo "=== Waiting for VM and LXD agent to be ready ==="
+          ./scripts/wait-for-vm.sh
+
+          echo "--- Post-wait verification: Test if we can execute commands ---"
+          if sudo lxc exec test-vm -- echo "Agent test successful" 2>/dev/null; then
+            echo "✅ LXD agent is responding correctly"
+          else
+            echo "❌ LXD agent still not ready, waiting additional time..."
+            sleep 30
+            if sudo lxc exec test-vm -- echo "Agent test after extra wait" 2>/dev/null; then
+              echo "✅ LXD agent ready after additional wait"
+            else
+              echo "❌ LXD agent still failing - this indicates a problem"
+              echo "VM Status:"
+              lxc list
+              echo "VM Info:"
+              lxc info test-vm
+              exit 1
+            fi
+          fi
 
       - name: Verify VM has IPv4 address
         run: |
           echo "=== Verifying VM network configuration ==="
           echo "--- LXD VM list with addresses ---"
           lxc list
-          
+
           echo "--- Checking for IPv4 address ---"
           if lxc list --format csv | grep test-vm | grep -E "10\.[0-9]+\.[0-9]+\.[0-9]+"; then
             echo "✅ SUCCESS: VM has IPv4 address"
@@ -73,10 +91,10 @@ jobs:
             lxc list
             exit 1
           fi
-          
-          echo "--- VM network interfaces detail ---"
+
+          echo "--- VM network interfaces detail (after agent is ready) ---"
           sudo lxc exec test-vm -- ip addr show
-          
+
           echo "--- VM routing table ---"
           sudo lxc exec test-vm -- ip route show
 
@@ -86,12 +104,12 @@ jobs:
       - name: Network connectivity diagnostics (IPv4)
         run: |
           echo "=== IPv4 Network Connectivity Tests ==="
-          
+
           echo "--- Testing external connectivity ---"
           sudo lxc exec test-vm -- bash -c "curl -I --connect-timeout 10 --max-time 30 http://httpbin.org/get" || true
           sudo lxc exec test-vm -- bash -c "curl -I --connect-timeout 10 --max-time 30 http://archive.ubuntu.com" || true
           sudo lxc exec test-vm -- bash -c "curl -I --connect-timeout 10 --max-time 30 https://download.docker.com" || true
-          
+
           echo "--- DNS resolution tests ---"
           sudo lxc exec test-vm -- bash -c "nslookup archive.ubuntu.com" || true
           sudo lxc exec test-vm -- bash -c "nslookup download.docker.com" || true
@@ -134,13 +152,13 @@ jobs:
       - name: Test Docker Hub connectivity
         run: |
           echo "=== Testing Docker Hub connectivity ==="
-          
+
           echo "--- Docker system info ---"
           sudo lxc exec test-vm -- bash -c "docker system info" || true
-          
+
           echo "--- Testing Docker Hub pull ---"
           time sudo lxc exec test-vm -- bash -c "docker pull hello-world"
-          
+
           echo "--- Running test container ---"
           sudo lxc exec test-vm -- bash -c "docker run --rm hello-world"
 
