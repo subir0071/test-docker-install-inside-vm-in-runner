@@ -41,7 +41,8 @@ GitHub shared runners are known to have networking issues that can cause flaky b
 ```text
 ├── README.md                           # This documentation
 ├── .github/workflows/                  # Test workflows for different installation methods
-│   └── test-docker-standard-apt.yml   # Baseline: Standard Docker apt installation
+│   ├── test-docker-standard-apt.yml   # Baseline: Standard Docker apt installation in VM
+│   └── test-runner-connectivity.yml   # Control: Network tests directly on runner
 ├── scripts/                            # Reusable installation and diagnostic scripts
 │   ├── install-lxd.sh                 # LXD installation and configuration
 │   ├── launch-vm.sh                   # VM creation with configurable parameters
@@ -60,13 +61,15 @@ GitHub shared runners are known to have networking issues that can cause flaky b
 
 ### ✅ Completed
 
-- **Baseline test workflow**: Reproduces standard Docker installation failures
+- **Baseline test workflow**: Reproduces standard Docker installation failures in VMs
+- **Control test workflow**: Tests network connectivity directly on GitHub runner
 - **Reusable scripts**: Modular components for testing different approaches
 - **Network issue documentation**: Detailed analysis of connectivity failures
 - **Diagnostic tooling**: Comprehensive logging and troubleshooting scripts
 
 ### 🔄 In Progress
 
+- Comparing VM vs direct runner network behavior
 - Testing alternative Docker installation methods
 - Developing workarounds for network connectivity issues
 
@@ -81,25 +84,37 @@ GitHub shared runners are known to have networking issues that can cause flaky b
 
 ## Documented Issues
 
-We have documented specific network connectivity failures:
+We have documented specific network connectivity failures in VM environments:
 
 1. **Ubuntu Repository Connectivity** (HTTP): Package manager cannot reach `archive.ubuntu.com` and `security.ubuntu.com`
 2. **Docker Registry Connectivity** (HTTPS): Cannot download GPG keys from `download.docker.com`
 
-Both issues show consistent network timeouts and "Network is unreachable" errors, confirming the GitHub Actions networking infrastructure problems.
+Both issues show consistent network timeouts and "Network is unreachable" errors in VMs. We're now testing if these same issues occur directly on GitHub runners to isolate whether this is VM-specific or runner-wide.
 
 See [docs/network-connectivity-issues.md](docs/network-connectivity-issues.md) for detailed analysis.
 
 ## How to Use This Repository
 
-### Running the Baseline Test
+### Running the Test Workflows
 
-The repository includes a baseline workflow that demonstrates the Docker installation failure:
+The repository includes two complementary workflows:
 
 ```bash
-# The workflow runs automatically on push/PR, or you can trigger it manually
+# VM-based test (reproduces Docker installation failures)
+# Workflow: test-docker-standard-apt.yml
+
+# Direct runner test (control test for comparison) 
+# Workflow: test-runner-connectivity.yml
+
+# Both run automatically on push/PR, or trigger manually
 # View results at: https://github.com/josecelano/test-docker-install-inside-vm-in-runner/actions
 ```
+
+### Understanding the Test Strategy
+
+1. **Baseline VM Test**: Documents Docker installation failures in LXD VMs
+2. **Control Runner Test**: Tests same operations directly on GitHub runner
+3. **Comparison**: Isolates whether issues are VM-specific or runner-wide
 
 ### Using the Scripts Independently
 

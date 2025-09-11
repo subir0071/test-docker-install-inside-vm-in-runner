@@ -28,9 +28,11 @@ sudo lxc exec $VM_NAME -- bash -c "nslookup download.docker.com" || true
 
 # Test connectivity to key hosts
 echo "--- Connectivity tests ---"
-sudo lxc exec $VM_NAME -- bash -c "ping -c 3 8.8.8.8" || true
-sudo lxc exec $VM_NAME -- bash -c "ping -c 3 archive.ubuntu.com" || true
+echo "NOTE: ping is not supported in GitHub shared runners (Azure limitation)"
+echo "Testing HTTP connectivity instead:"
+sudo lxc exec $VM_NAME -- bash -c "curl -I --connect-timeout 10 --max-time 30 http://httpbin.org/get" || true
 sudo lxc exec $VM_NAME -- bash -c "curl -I --connect-timeout 10 --max-time 30 http://archive.ubuntu.com" || true
+sudo lxc exec $VM_NAME -- bash -c "curl -I --connect-timeout 10 --max-time 30 https://download.docker.com" || true
 sudo lxc exec $VM_NAME -- bash -c "curl -I --connect-timeout 10 --max-time 30 https://download.docker.com" || true
 
 echo "Network diagnostics completed!"

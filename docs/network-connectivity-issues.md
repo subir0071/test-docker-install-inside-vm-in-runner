@@ -2,7 +2,18 @@
 
 ## Overview
 
-This document captures specific network connectivity issues encountered when running Docker installations inside virtual machines on GitHub shared runners.
+This document captures specific network connectivity issues encountered when running Docker installations inside virtual machines on GitHub shared runners, and compares them with direct runner connectivity tests.
+
+## Testing Methodology
+
+We use two complementary approaches to isolate the source of network issues:
+
+1. **VM-based tests** (`test-docker-standard-apt.yml`): Test Docker installation inside LXD VMs
+2. **Direct runner tests** (`test-runner-connectivity.yml`): Test same operations directly on GitHub runner
+
+This comparison helps determine if issues are:
+- **VM-specific**: Problems only occur in virtualized environments
+- **Runner-wide**: Problems affect the GitHub runner infrastructure generally
 
 ## Issue #2: Docker Registry HTTPS Connectivity Timeout
 

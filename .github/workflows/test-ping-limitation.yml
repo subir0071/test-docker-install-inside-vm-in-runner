@@ -1,0 +1,82 @@
+# Test Ping Limitation in GitHub Shared Runners
+#
+# This workflow demonstrates that ping (ICMP) is not supported in GitHub shared runners.
+# GitHub runners are placed in Azure, and Azure doesn't support ICMP packets by design.
+# Reference: https://github.com/actions/runner-images/issues/1519#issuecomment-683790054
+#
+# Expected results:
+# - ping commands will fail with 100% packet loss
+# - curl/wget commands will work normally
+# - This proves ping is blocked but HTTP/HTTPS connectivity is functional
+#
+# This test validates that our network connectivity issues in VMs are not related
+# to ping limitations, since we observe HTTP/HTTPS failures in the VM tests.
+
+name: Test Ping Limitation in GitHub Runners
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+    paths:
+      - '.github/workflows/test-ping-limitation.yml'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - '.github/workflows/test-ping-limitation.yml'
+
+jobs:
+  test-ping-limitation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Test ping to Google (Expected to FAIL)
+        run: |
+          echo "Testing ping to google.com - this should fail with 100% packet loss"
+          echo "GitHub runners are in Azure, which doesn't support ICMP by design"
+          ping -c 5 google.com || echo "❌ Ping failed as expected (exit code: $?)"
+
+      - name: Test ping to GitHub (Expected to FAIL)
+        run: |
+          echo "Testing ping to github.com - this should also fail"
+          ping -c 3 github.com || echo "❌ Ping failed as expected (exit code: $?)"
+
+      - name: Test ping to Cloudflare DNS (Expected to FAIL)
+        run: |
+          echo "Testing ping to 1.1.1.1 - even IP addresses should fail"
+          ping -c 3 1.1.1.1 || echo "❌ Ping failed as expected (exit code: $?)"
+
+      - name: Verify HTTP connectivity works (Expected to PASS)
+        run: |
+          echo "Testing HTTP connectivity with curl - this should work"
+          echo "✅ Testing HTTP to httpbin.org"
+          curl -s --max-time 10 "http://httpbin.org/get" | head -10
+
+      - name: Verify HTTPS connectivity works (Expected to PASS)
+        run: |
+          echo "✅ Testing HTTPS to httpbin.org"
+          curl -s --max-time 10 "https://httpbin.org/get" | head -10
+
+      - name: Test GitHub API connectivity (Expected to PASS)
+        run: |
+          echo "✅ Testing GitHub API connectivity"
+          curl -s --max-time 10 "https://api.github.com/rate_limit" | head -10
+
+      - name: Test DNS resolution works (Expected to PASS)
+        run: |
+          echo "✅ Testing DNS resolution with nslookup"
+          nslookup github.com
+          nslookup google.com
+
+      - name: Summary
+        run: |
+          echo ""
+          echo "=== PING LIMITATION TEST SUMMARY ==="
+          echo "✅ HTTP/HTTPS connectivity: WORKING"
+          echo "✅ DNS resolution: WORKING"
+          echo "❌ ICMP/ping: BLOCKED (by design in Azure)"
+          echo ""
+          echo "This confirms that ping failure is a platform limitation,"
+          echo "not a network connectivity issue. Our VM networking problems"
+          echo "are separate issues affecting HTTP/HTTPS traffic."

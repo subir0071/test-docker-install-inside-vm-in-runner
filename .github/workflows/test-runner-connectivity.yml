@@ -1,0 +1,137 @@
+# Test Network Connectivity - Direct GitHub Runner
+#
+# This workflow tests network connectivity directly on the GitHub shared runner
+# (without creating VMs) to determine if networking issues are specific to
+# virtualized environments or affect the runner infrastructure itself.
+#
+# Purpose: Compare network behavior between direct runner and VM environments
+# Method: Package installation, repository updates, and connectivity tests
+# Expected Result: Help isolate if issues are VM-specific or runner-wide
+#
+# This serves as a control test to compare against VM-based workflows.
+#
+# Related Issues:
+# - https://github.com/actions/runner-images/issues/1187
+# - Network connectivity comparison: runner vs VM environments
+#
+# Documentation: docs/network-connectivity-issues.md
+
+name: Test Network Connectivity on GitHub Runner
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test-runner-connectivity:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: System information
+        run: |
+          echo "=== System Information ==="
+          echo "--- OS Information ---"
+          cat /etc/os-release
+          echo "--- Kernel version ---"
+          uname -a
+          echo "--- Available memory ---"
+          free -h
+          echo "--- Disk space ---"
+          df -h
+          echo "--- Network interfaces ---"
+          ip addr show
+          echo "--- Routing table ---"
+          ip route show
+
+      - name: Test basic network connectivity
+        run: |
+          echo "=== Testing basic network connectivity ==="
+          echo "NOTE: ping is not supported in GitHub shared runners (Azure limitation)"
+          echo "Testing with HTTP requests instead:"
+          curl -s --max-time 5 --head "http://httpbin.org/get" | head -5 || true
+          curl -s --max-time 5 --head "https://httpbin.org/get" | head -5 || true
+          curl -s --max-time 5 --head "http://archive.ubuntu.com/" | head -5 || true
+          
+          echo "--- HTTP/HTTPS connectivity tests ---"
+          curl -I --connect-timeout 30 --max-time 60 http://archive.ubuntu.com || true
+          curl -I --connect-timeout 30 --max-time 60 https://download.docker.com || true
+          curl -I --connect-timeout 30 --max-time 60 https://packages.microsoft.com || true
+
+      - name: Test package manager operations
+        run: |
+          echo "=== Testing Package Manager Operations ==="
+          
+          echo "--- Current package cache status ---"
+          sudo apt list --installed | head -10
+          
+          echo "--- Testing package list update ---"
+          time sudo apt-get update -y || true
+          
+          echo "--- Testing package installation (small package) ---"
+          # Install a small package that's likely not pre-installed
+          time sudo apt-get install -y tree || true
+          
+          echo "--- Testing package installation (development package) ---"
+          # Try installing a development package
+          time sudo apt-get install -y jq || true
+
+      - name: Test Docker operations (pre-installed)
+        run: |
+          echo "=== Testing Docker Operations ==="
+          
+          echo "--- Docker version ---"
+          docker --version || true
+          
+          echo "--- Docker system info ---"
+          docker system info || true
+          
+          echo "--- Test Docker Hub connectivity ---"
+          time docker pull hello-world || true
+          
+          echo "--- Run test container ---"
+          docker run --rm hello-world || true
+
+      - name: Test alternative package sources
+        run: |
+          echo "=== Testing Alternative Package Sources ==="
+          
+          echo "--- Add Microsoft packages repository ---"
+          # Test adding an external repository (similar to Docker repo addition)
+          curl -sSL https://packages.microsoft.com/keys/microsoft.asc | sudo apt-key add - || true
+          echo "deb [arch=amd64,arm64,armhf signed-by=/usr/share/keyrings/microsoft-archive-keyring.gpg] https://packages.microsoft.com/repos/code stable main" | sudo tee /etc/apt/sources.list.d/vscode.list || true
+          
+          echo "--- Update with new repository ---"
+          time sudo apt-get update || true
+
+      - name: Network performance tests
+        run: |
+          echo "=== Network Performance Tests ==="
+          
+          echo "--- Download speed test (small files) ---"
+          time curl -o /tmp/test1.txt https://httpbin.org/bytes/1024 || true
+          time curl -o /tmp/test2.txt https://download.docker.com/linux/ubuntu/gpg || true
+          
+          echo "--- Multiple concurrent connections ---"
+          (curl -I --connect-timeout 10 --max-time 30 http://archive.ubuntu.com &
+           curl -I --connect-timeout 10 --max-time 30 https://download.docker.com &
+           curl -I --connect-timeout 10 --max-time 30 https://packages.microsoft.com &
+           wait) || true
+
+      - name: Compare with VM-based issues
+        run: |
+          echo "=== Comparison Summary ==="
+          echo "This workflow tests the same operations that fail in VMs:"
+          echo "1. Package manager updates (apt-get update)"
+          echo "2. External repository access (Docker, Microsoft)"
+          echo "3. Package installations"
+          echo "4. Network connectivity to same hosts"
+          echo ""
+          echo "If this workflow succeeds where VM workflow fails,"
+          echo "it indicates the issue is specific to virtualized environments."
+          echo ""
+          echo "If this workflow also shows failures,"
+          echo "it indicates broader GitHub runner infrastructure issues."
