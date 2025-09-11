@@ -9,6 +9,7 @@ After extensive investigation, we have identified that **GitHub-hosted runners h
 **Workflow Results**: [Docker-in-Docker test completed successfully](https://github.com/josecelano/test-docker-install-inside-vm-in-runner/actions/runs/17651858372/job/50164731103)
 
 ### ✅ **What Works**: Docker-in-Docker
+
 - **✅ Container creation**: Ubuntu 24.04 + Docker CE built successfully
 - **✅ Network connectivity**: Full outbound network access from inside container
 - **✅ Package manager**: APT operations work without issues
@@ -17,6 +18,7 @@ After extensive investigation, we have identified that **GitHub-hosted runners h
 - **✅ Advanced features**: Building images inside Docker-in-Docker
 
 ### ❌ **What Doesn't Work**: Virtual Machines (LXD)
+
 - **❌ VMs fail**: All outbound connections timeout despite proper IP configuration
 - **❌ Network isolation**: Azure/GitHub policies block VM traffic patterns
 - **❌ Package installation**: Cannot reach repositories from inside VMs
@@ -24,12 +26,14 @@ After extensive investigation, we have identified that **GitHub-hosted runners h
 ## Root Cause Analysis
 
 ### Infrastructure Design
+
 - **GitHub runners are hosted in Azure datacenters**
 - **Network policies are designed for runner processes, not nested VMs**
 - **Container traffic is allowed**, but **VM traffic is blocked**
 - **Security groups treat containers and VMs differently**
 
 ### Evidence from GitHub Documentation
+
 Based on [GitHub's official runner documentation](https://docs.github.com/en/actions/reference/runners/github-hosted-runners):
 
 1. **Nested virtualization limitations**: Explicitly mentioned for macOS arm64 runners
@@ -38,10 +42,11 @@ Based on [GitHub's official runner documentation](https://docs.github.com/en/act
 4. **Azure infrastructure constraints**: Windows/Ubuntu runners hosted in Azure with managed networking
 
 ### Technical Symptoms Analysis
-| Approach | Network Connectivity | Docker Operations | Package Manager | Status |
-|----------|---------------------|-------------------|-----------------|--------|
-| **VMs (LXD)** | ❌ All connections timeout | ❌ Cannot pull images | ❌ APT fails | **BLOCKED** |
-| **Containers (DinD)** | ✅ Full connectivity | ✅ All operations work | ✅ APT works | **SUCCESS** |
+
+| Approach                    | Network Connectivity                            | Docker Operations                           | Package Manager | Status      |
+| --------------------------- | ----------------------------------------------- | ------------------------------------------- | --------------- | ----------- |
+| **VMs (LXD)**               | ❌ All connections timeout                      | ❌ Cannot pull images                       | ❌ APT fails    | **BLOCKED** |
+| **Containers (DinD)**       | ✅ Full connectivity                            | ✅ All operations work                      | ✅ APT works    | **SUCCESS** |
 | ❌ HTTP connections timeout | Direct routing blocked by Azure/GitHub policies | Outbound connections not permitted from VMs |
 | ❌ Package manager failures | APT/YUM traffic doesn't match expected patterns | Software installation impossible            |
 

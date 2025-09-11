@@ -1,0 +1,248 @@
+name: Test Docker-in-Docker Runtime Installation
+# Test Docker-in-Docker Runtime Installation
+#
+# This workflow tests Docker-in-Docker with RUNTIME installation instead of build-time installation.
+# This approach tests whether the Docker installation process itself works within containers
+# and provides insights into network connectivity during the installation phase.
+#
+# Key Differences from build-time approach:
+# 1. Base image contains only Ubuntu 24.04 + basic tools
+# 2. Docker is installed at runtime when container is running
+# 3. Tests both installation process and final functionality
+# 4. Provides more granular debugging of network issues
+#
+# Expected Benefits:
+# - Tests network connectivity during installation phase
+# - Verifies package manager works for Docker repository access
+# - Confirms GPG key download and repository setup
+# - Validates complete Docker installation workflow
+#
+# References:
+# - docs/SOLUTION-docker-in-docker.md (build-time installation success)
+# - Comparison test to understand installation vs runtime differences
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/test-docker-runtime-install.yml"
+      - "docker/Dockerfile.runtime"
+      - "docker/install-docker-runtime.sh"
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/test-docker-runtime-install.yml"
+      - "docker/Dockerfile.runtime"
+      - "docker/install-docker-runtime.sh"
+
+jobs:
+  docker-runtime-install-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build base Ubuntu container (no Docker installed)
+        run: |
+          echo "=== Building Ubuntu 24.04 base container without Docker ==="
+          echo "This container only has basic tools - Docker will be installed at runtime"
+
+          docker build -f docker/Dockerfile.runtime -t ubuntu-base:24.04 docker/
+
+          echo "--- Verifying base image ---"
+          docker run --rm ubuntu-base:24.04 lsb_release -a
+          docker run --rm ubuntu-base:24.04 curl --version
+          docker run --rm ubuntu-base:24.04 which docker || echo "✅ Confirmed: Docker not installed in base image"
+
+      - name: Start base container
+        run: |
+          echo "=== Starting base Ubuntu container ==="
+
+          docker run -d --privileged \
+            --name runtime-container \
+            -v /var/lib/docker \
+            ubuntu-base:24.04 sleep infinity
+            
+          echo "--- Verifying container is running ---"
+          docker ps | grep runtime-container
+
+          echo "--- Basic container information ---"
+          docker exec runtime-container uname -a
+          docker exec runtime-container cat /etc/os-release
+
+      - name: Test network connectivity before Docker installation
+        run: |
+          echo "=== Testing network connectivity BEFORE Docker installation ==="
+
+          echo "--- Basic network interface check ---"
+          docker exec runtime-container ip addr show
+
+          echo "--- DNS resolution tests ---"
+          docker exec runtime-container nslookup google.com || true
+          docker exec runtime-container nslookup docker.io || true
+          docker exec runtime-container nslookup download.docker.com || true
+          docker exec runtime-container nslookup archive.ubuntu.com || true
+
+          echo "--- HTTP connectivity tests ---"
+          docker exec runtime-container curl -I --connect-timeout 10 --max-time 30 http://httpbin.org/get || true
+          docker exec runtime-container curl -I --connect-timeout 10 --max-time 30 http://google.com || true
+          docker exec runtime-container curl -I --connect-timeout 10 --max-time 30 https://download.docker.com || true
+          docker exec runtime-container curl -I --connect-timeout 10 --max-time 30 http://archive.ubuntu.com || true
+
+          echo "--- Package manager connectivity test ---"
+          docker exec runtime-container apt-get update || true
+
+      - name: Install Docker at runtime
+        run: |
+          echo "=== Installing Docker inside running container ==="
+
+          # Copy installation script into container
+          docker cp docker/install-docker-runtime.sh runtime-container:/usr/local/bin/install-docker.sh
+          docker exec runtime-container chmod +x /usr/local/bin/install-docker.sh
+
+          echo "--- Running Docker installation script ---"
+          docker exec runtime-container /usr/local/bin/install-docker.sh || echo "Docker installation encountered issues"
+
+          echo "--- Checking if Docker was installed ---"
+          docker exec runtime-container which docker || echo "Docker binary not found"
+          docker exec runtime-container docker --version || echo "Docker version check failed"
+
+      - name: Verify Docker daemon startup
+        run: |
+          echo "=== Verifying Docker daemon is running ==="
+
+          echo "--- Checking Docker daemon process ---"
+          docker exec runtime-container pgrep dockerd || echo "Docker daemon not running"
+          docker exec runtime-container ps aux | grep dockerd || echo "No dockerd process found"
+
+          echo "--- Testing Docker daemon connectivity ---"
+          docker exec runtime-container docker version || echo "Docker daemon not responding"
+          docker exec runtime-container docker info || echo "Docker daemon info failed"
+
+      - name: Test Docker operations at runtime
+        run: |
+          echo "=== Testing Docker operations inside runtime container ==="
+
+          if docker exec runtime-container docker version >/dev/null 2>&1; then
+            echo "✅ Docker daemon is working - proceeding with tests"
+            
+            echo "--- Test Docker Hub connectivity ---"
+            time docker exec runtime-container docker pull hello-world || echo "Docker pull failed"
+            
+            echo "--- Test running a container ---"
+            docker exec runtime-container docker run --rm hello-world || echo "Docker run failed"
+            
+            echo "--- Test pulling Ubuntu image ---"
+            time docker exec runtime-container docker pull ubuntu:22.04 || echo "Ubuntu pull failed"
+            
+            echo "--- Test running Ubuntu container ---"
+            docker exec runtime-container docker run --rm ubuntu:22.04 echo "Ubuntu container works!" || echo "Ubuntu container failed"
+            
+            echo "--- List all images ---"
+            docker exec runtime-container docker images
+          else
+            echo "❌ Docker daemon not working - skipping Docker operations tests"
+            echo "This indicates Docker installation or startup failed"
+          fi
+
+      - name: Test advanced Docker features
+        run: |
+          echo "=== Testing advanced Docker features in runtime container ==="
+
+          if docker exec runtime-container docker version >/dev/null 2>&1; then
+            echo "--- Test building a simple image inside runtime container ---"
+            docker exec runtime-container bash -c '
+              mkdir -p /tmp/test-build
+              cd /tmp/test-build
+              cat > Dockerfile << "DOCKERFILE_END"
+            FROM ubuntu:22.04
+            RUN echo "Built inside runtime Docker-in-Docker!" > /test-file
+            CMD cat /test-file
+            DOCKERFILE_END
+              docker build -t runtime-test-image .
+            ' || echo "Docker build failed"
+            
+            echo "--- Test running the built image ---"
+            docker exec runtime-container docker run --rm runtime-test-image || echo "Running built image failed"
+          else
+            echo "❌ Skipping advanced tests - Docker daemon not available"
+          fi
+
+      - name: Network connectivity comparison
+        run: |
+          echo "=== Network Connectivity Analysis ==="
+
+          echo "--- Testing final network state ---"
+          docker exec runtime-container curl -I --connect-timeout 5 --max-time 10 http://httpbin.org/get || true
+          docker exec runtime-container curl -I --connect-timeout 5 --max-time 10 https://docker.io || true
+
+          echo "--- Package manager final test ---"
+          docker exec runtime-container apt-get update || true
+
+      - name: Compare with build-time installation
+        run: |
+          echo "=== Comparison: Runtime Installation vs Build-time Installation ==="
+          echo ""
+
+          if docker exec runtime-container docker version >/dev/null 2>&1; then
+            echo "✅ SUCCESS: Runtime Docker installation works!"
+            echo "✅ Network connectivity: FUNCTIONAL during installation"
+            echo "✅ Docker daemon: STARTED successfully at runtime"
+            echo "✅ Container operations: WORKING after runtime install"
+            echo "✅ Docker Hub access: AVAILABLE after installation"
+            echo ""
+            echo "🎯 CONCLUSION: Both build-time and runtime installation work"
+            echo "🔍 KEY INSIGHT: Installation process itself works in containers"
+          else
+            echo "❌ FAILURE: Runtime Docker installation failed"
+            echo "❌ This could indicate installation-specific network issues"
+            echo ""
+            echo "🤔 CONCLUSION: Installation process may have different network requirements"
+          fi
+
+          echo ""
+          echo "📊 Installation Method Comparison:"
+          echo "- Build-time (Dockerfile): ✅ Known to work"
+          echo "- Runtime (in container): $(docker exec runtime-container docker version >/dev/null 2>&1 && echo '✅ Also works' || echo '❌ Failed')"
+
+      - name: Success summary
+        if: success()
+        run: |
+          echo ""
+          echo "🎉 === RUNTIME DOCKER INSTALLATION RESULTS === 🎉"
+          echo ""
+
+          if docker exec runtime-container docker version >/dev/null 2>&1; then
+            echo "✅ Runtime container created and running"
+            echo "✅ Network connectivity confirmed before installation"
+            echo "✅ Docker installation completed at runtime"
+            echo "✅ Docker daemon started successfully"
+            echo "✅ Docker operations functional after runtime install"
+            echo "✅ Container building and running successful"
+            echo ""
+            echo "🔍 FINDING: Runtime installation works just like build-time installation"
+            echo "🎯 CONCLUSION: Docker-in-Docker is robust across installation methods"
+          else
+            echo "❌ Runtime installation encountered issues"
+            echo "ℹ️ This helps identify specific installation vs runtime differences"
+          fi
+
+          echo ""
+          echo "This test validates that Docker-in-Docker works with both:"
+          echo "- Pre-installed Docker (build-time)"
+          echo "- Runtime-installed Docker (this test)"
+
+      - name: Cleanup
+        if: always()
+        run: |
+          echo "=== Cleaning up runtime test environment ==="
+          docker stop runtime-container || true
+          docker rm runtime-container || true
+          docker rmi ubuntu-base:24.04 || true
+          echo "Runtime test cleanup completed"

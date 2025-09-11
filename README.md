@@ -13,6 +13,7 @@ This repository investigated **network connectivity failures** when running virt
 **Successful Test**: [Docker-in-Docker workflow completed successfully](https://github.com/josecelano/test-docker-install-inside-vm-in-runner/actions/runs/17651858372/job/50164731103)
 
 ### ✅ **What Works**: Docker-in-Docker
+
 - **Full network connectivity** from inside containers
 - **Package manager operations** (apt-get update/install work perfectly)
 - **Docker Hub access** (pull/push operations successful)
@@ -20,6 +21,7 @@ This repository investigated **network connectivity failures** when running virt
 - **All standard development workflows** function normally
 
 ### ❌ **What Doesn't Work**: Virtual Machines (LXD)
+
 - All outbound HTTP/HTTPS connections timeout
 - Package managers cannot reach repositories
 - Software installation fails due to network unreachability
@@ -27,10 +29,12 @@ This repository investigated **network connectivity failures** when running virt
 ## Root Cause Analysis
 
 **GitHub-hosted runners use Azure infrastructure** with different network policies for containers vs VMs:
+
 - **Container traffic**: ✅ Allowed and properly routed
 - **VM traffic**: ❌ Blocked by security groups and network policies
 
 **Key Evidence**:
+
 - GitHub's [official documentation](https://docs.github.com/en/actions/reference/runners/github-hosted-runners) mentions nested-virtualization limitations
 - Network policies are designed for runner processes and containers, not nested VMs
 - Azure infrastructure treats container networking differently than VM networking
