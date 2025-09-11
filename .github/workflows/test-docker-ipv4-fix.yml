@@ -1,0 +1,171 @@
+# Test Docker Installation - IPv4 Networking Fix
+#
+# This workflow tests our hypothesis that network connectivity issues are caused
+# by VMs getting IPv6-only addresses in GitHub runners where IPv6 is not supported.
+#
+# Hypothesis: VMs with IPv6-only addresses cannot reach external services because
+# GitHub runners block IPv6 traffic due to infrastructure constraints.
+#
+# Solution: Configure LXD to provide IPv4 addresses to VMs instead of IPv6-only.
+#
+# Expected Result: Docker installation should succeed with IPv4 networking.
+#
+# References:
+# - https://github.com/actions/runner-images/issues/668 (IPv6 not supported)
+# - https://github.com/actions/runner/issues/402 (Original IPv6 issue)
+#
+# Documentation: docs/solutions/01-ipv6-connectivity-fix.md
+
+name: Test Docker IPv4 Networking Fix
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/test-docker-ipv4-fix.yml'
+      - 'scripts/configure-ipv4-networking.sh'
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/test-docker-ipv4-fix.yml'
+      - 'scripts/configure-ipv4-networking.sh'
+
+jobs:
+  docker-ipv4-fix:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install LXD
+        run: ./scripts/install-lxd.sh
+
+      - name: Configure IPv4-only networking
+        run: ./scripts/configure-ipv4-networking.sh
+
+      - name: Launch LXD VM with IPv4
+        run: |
+          echo "=== Launching VM with IPv4 networking ==="
+          ./scripts/launch-vm.sh
+          
+          echo "--- Verifying network configuration after launch ---"
+          lxc network list
+          echo "--- VM network interfaces ---"
+          sudo lxc exec test-vm -- ip addr show
+
+      - name: Wait for VM to be ready
+        run: ./scripts/wait-for-vm.sh
+
+      - name: Verify VM has IPv4 address
+        run: |
+          echo "=== Verifying VM network configuration ==="
+          echo "--- LXD VM list with addresses ---"
+          lxc list
+          
+          echo "--- Checking for IPv4 address ---"
+          if lxc list --format csv | grep test-vm | grep -E "10\.[0-9]+\.[0-9]+\.[0-9]+"; then
+            echo "✅ SUCCESS: VM has IPv4 address"
+          else
+            echo "❌ FAIL: VM does not have IPv4 address"
+            lxc list
+            exit 1
+          fi
+          
+          echo "--- VM network interfaces detail ---"
+          sudo lxc exec test-vm -- ip addr show
+          
+          echo "--- VM routing table ---"
+          sudo lxc exec test-vm -- ip route show
+
+      - name: Test basic VM functionality
+        run: ./scripts/test-vm-basic.sh
+
+      - name: Network connectivity diagnostics (IPv4)
+        run: |
+          echo "=== IPv4 Network Connectivity Tests ==="
+          
+          echo "--- Testing external connectivity ---"
+          sudo lxc exec test-vm -- bash -c "curl -I --connect-timeout 10 --max-time 30 http://httpbin.org/get" || true
+          sudo lxc exec test-vm -- bash -c "curl -I --connect-timeout 10 --max-time 30 http://archive.ubuntu.com" || true
+          sudo lxc exec test-vm -- bash -c "curl -I --connect-timeout 10 --max-time 30 https://download.docker.com" || true
+          
+          echo "--- DNS resolution tests ---"
+          sudo lxc exec test-vm -- bash -c "nslookup archive.ubuntu.com" || true
+          sudo lxc exec test-vm -- bash -c "nslookup download.docker.com" || true
+
+      - name: Install Docker inside VM (The Main Test)
+        run: |
+          echo "=== Installing Docker inside VM with IPv4 networking ==="
+          echo "This is the main test - if IPv4 fixes our issue, this should succeed"
+
+          # Update package manager
+          echo "--- Updating package manager ---"
+          time sudo lxc exec test-vm -- bash -c "apt-get update -y"
+
+          echo "--- Installing prerequisites ---"
+          time sudo lxc exec test-vm -- bash -c "apt-get install -y ca-certificates curl gnupg lsb-release"
+
+          # Add Docker's official GPG key
+          echo "--- Adding Docker GPG key ---"
+          sudo lxc exec test-vm -- bash -c "install -m 0755 -d /etc/apt/keyrings"
+          time sudo lxc exec test-vm -- bash -c "curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc"
+          sudo lxc exec test-vm -- bash -c "chmod a+r /etc/apt/keyrings/docker.asc"
+
+          # Add the Docker repository
+          echo "--- Adding Docker repository ---"
+          sudo lxc exec test-vm -- bash -c 'echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null'
+
+          # Update package index with Docker repository
+          echo "--- Updating package index with Docker repository ---"
+          time sudo lxc exec test-vm -- bash -c "apt-get update -y"
+
+          # Install Docker packages
+          echo "--- Installing Docker packages ---"
+          time sudo lxc exec test-vm -- bash -c "apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin"
+
+          echo "✅ Docker installation completed successfully!"
+
+      - name: Verify Docker installation
+        run: ./scripts/verify-docker.sh
+
+      - name: Test Docker Hub connectivity
+        run: |
+          echo "=== Testing Docker Hub connectivity ==="
+          
+          echo "--- Docker system info ---"
+          sudo lxc exec test-vm -- bash -c "docker system info" || true
+          
+          echo "--- Testing Docker Hub pull ---"
+          time sudo lxc exec test-vm -- bash -c "docker pull hello-world"
+          
+          echo "--- Running test container ---"
+          sudo lxc exec test-vm -- bash -c "docker run --rm hello-world"
+
+      - name: Success summary
+        run: |
+          echo ""
+          echo "🎉 === IPv4 NETWORKING FIX SUCCESS === 🎉"
+          echo ""
+          echo "✅ VM obtained IPv4 address"
+          echo "✅ Network connectivity working" 
+          echo "✅ Package manager operations successful"
+          echo "✅ Docker installation completed"
+          echo "✅ Docker Hub connectivity working"
+          echo "✅ Container operations functional"
+          echo ""
+          echo "🔍 ROOT CAUSE CONFIRMED: IPv6-only networking was the issue!"
+          echo "🎯 SOLUTION VALIDATED: IPv4 networking fixes all connectivity problems"
+          echo ""
+          echo "This proves our hypothesis that VMs with IPv6-only addresses"
+          echo "cannot reach external services in GitHub runner environments."
+
+      - name: Docker installation diagnostics
+        if: always()
+        run: ./scripts/docker-diagnostics.sh
+
+      - name: Stop and delete VM
+        if: always()
+        run: ./scripts/cleanup-vm.sh

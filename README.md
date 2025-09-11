@@ -43,9 +43,11 @@ GitHub shared runners are known to have networking issues that can cause flaky b
 ├── .github/workflows/                  # Test workflows for different installation methods
 │   ├── test-docker-standard-apt.yml   # Baseline: Standard Docker apt installation in VM
 │   ├── test-runner-connectivity.yml   # Control: Network tests directly on runner
-│   └── test-ping-limitation.yml       # Platform test: Demonstrates ICMP blocking
+│   ├── test-ping-limitation.yml       # Platform test: Demonstrates ICMP blocking
+│   └── test-docker-ipv4-fix.yml       # Solution test: IPv4 networking fix for VMs
 ├── scripts/                            # Reusable installation and diagnostic scripts
 │   ├── install-lxd.sh                 # LXD installation and configuration
+│   ├── configure-ipv4-networking.sh   # IPv4-only network configuration for VMs
 │   ├── launch-vm.sh                   # VM creation with configurable parameters
 │   ├── wait-for-vm.sh                 # VM readiness checking with timeout
 │   ├── test-vm-basic.sh               # Basic VM functionality tests
@@ -55,7 +57,10 @@ GitHub shared runners are known to have networking issues that can cause flaky b
 │   ├── cleanup-vm.sh                  # VM cleanup and resource management
 │   └── README.md                      # Scripts documentation and usage
 └── docs/                              # Detailed documentation and findings
-    └── network-connectivity-issues.md # Documented network failures and analysis
+    ├── network-connectivity-issues.md # Documented network failures and analysis
+    └── solutions/                     # Solution research and implementation
+        ├── README.md                  # Solutions documentation overview
+        └── 01-ipv6-connectivity-fix.md # IPv6/IPv4 networking investigation
 ```
 
 ## Current Status
@@ -66,6 +71,7 @@ GitHub shared runners are known to have networking issues that can cause flaky b
 - **Control test workflow**: Tests network connectivity directly on GitHub runner
 - **✅ Root cause identified**: Network issues are **VM-specific**, not runner infrastructure problems
 - **Control test results**: Direct runner connectivity tests **ALL PASSED** (September 11, 2025)
+- **🔍 IPv6 root cause discovered**: VMs get IPv6-only addresses, but GitHub runners block IPv6 traffic
 - **✅ Ping limitation confirmed**: Test workflow verified ICMP is blocked in GitHub runners (Azure design)
 - **Platform limitation results**: Ping tests failed (12-14s timeouts), HTTP tests passed (0-4s)
 - **Refactored connectivity tests**: All workflows use HTTP-based connectivity testing only
@@ -73,11 +79,11 @@ GitHub shared runners are known to have networking issues that can cause flaky b
 - **Network issue documentation**: Detailed analysis of connectivity failures
 - **Diagnostic tooling**: Comprehensive logging and troubleshooting scripts
 
-### 🔄 In Progress
+### � In Active Testing
 
-- Developing VM networking solutions (LXD configuration, network routing)
-- Testing alternative Docker installation methods for VM environments
-- Creating workarounds for VM-specific network limitations
+- **IPv4 networking solution**: Testing hypothesis that IPv6-only VMs cause connectivity failures
+- **Solution workflow**: `test-docker-ipv4-fix.yml` validates IPv4 networking fix
+- **Expected outcome**: Docker installation should succeed with IPv4 addresses
 
 ### 📋 Planned
 
@@ -96,25 +102,25 @@ GitHub shared runners are known to have networking issues that can cause flaky b
 
 Our comprehensive testing has revealed significant differences between running operations directly on GitHub shared runners versus inside VMs created within those runners (double virtualization):
 
-| Operation/Feature | Direct GitHub Runner | VM Inside Runner (LXD) | Status |
-|------------------|---------------------|------------------------|---------|
-| **Network Operations** | | | |
-| Package manager (`apt-get update`) | ✅ Works perfectly | ❌ Fails with timeouts | **VM-specific issue** |
-| External repository access | ✅ Works (Docker, Microsoft repos) | ❌ Connection timeouts | **VM-specific issue** |
-| HTTP connectivity | ✅ Fast (0-4s responses) | ❌ Slow/timeout | **VM-specific issue** |
-| HTTPS connectivity | ✅ Fast (0-4s responses) | ❌ Slow/timeout | **VM-specific issue** |
-| DNS resolution | ✅ Works correctly | ✅ Works correctly | **Both work** |
-| **Docker Operations** | | | |
-| Docker Hub connectivity | ✅ Works perfectly | ❌ Registry timeouts | **VM-specific issue** |
-| Container pulls | ✅ Fast downloads | ❌ Network failures | **VM-specific issue** |
-| Docker daemon | ✅ Pre-installed & working | ❌ Installation fails | **VM-specific issue** |
-| **Platform Limitations** | | | |
-| ICMP/Ping support | ❌ Blocked (Azure design) | ❌ Blocked (Azure design) | **Both blocked** |
-| Ping timeout behavior | 12-14s timeouts | 12-14s timeouts | **Same limitation** |
-| **Performance** | | | |
-| Network latency | Fast (0-4s) | Slow/timeout (30s+) | **VM degrades performance** |
-| Package installation | Fast | Fails due to network | **VM blocks operations** |
-| Resource usage | Direct access | Nested virtualization overhead | **VM adds overhead** |
+| Operation/Feature                  | Direct GitHub Runner               | VM Inside Runner (LXD)         | Status                      |
+| ---------------------------------- | ---------------------------------- | ------------------------------ | --------------------------- |
+| **Network Operations**             |                                    |                                |                             |
+| Package manager (`apt-get update`) | ✅ Works perfectly                 | ❌ Fails with timeouts         | **VM-specific issue**       |
+| External repository access         | ✅ Works (Docker, Microsoft repos) | ❌ Connection timeouts         | **VM-specific issue**       |
+| HTTP connectivity                  | ✅ Fast (0-4s responses)           | ❌ Slow/timeout                | **VM-specific issue**       |
+| HTTPS connectivity                 | ✅ Fast (0-4s responses)           | ❌ Slow/timeout                | **VM-specific issue**       |
+| DNS resolution                     | ✅ Works correctly                 | ✅ Works correctly             | **Both work**               |
+| **Docker Operations**              |                                    |                                |                             |
+| Docker Hub connectivity            | ✅ Works perfectly                 | ❌ Registry timeouts           | **VM-specific issue**       |
+| Container pulls                    | ✅ Fast downloads                  | ❌ Network failures            | **VM-specific issue**       |
+| Docker daemon                      | ✅ Pre-installed & working         | ❌ Installation fails          | **VM-specific issue**       |
+| **Platform Limitations**           |                                    |                                |                             |
+| ICMP/Ping support                  | ❌ Blocked (Azure design)          | ❌ Blocked (Azure design)      | **Both blocked**            |
+| Ping timeout behavior              | 12-14s timeouts                    | 12-14s timeouts                | **Same limitation**         |
+| **Performance**                    |                                    |                                |                             |
+| Network latency                    | Fast (0-4s)                        | Slow/timeout (30s+)            | **VM degrades performance** |
+| Package installation               | Fast                               | Fails due to network           | **VM blocks operations**    |
+| Resource usage                     | Direct access                      | Nested virtualization overhead | **VM adds overhead**        |
 
 ### Key Insights
 
@@ -125,11 +131,11 @@ Our comprehensive testing has revealed significant differences between running o
 
 ### Test Evidence
 
-| Test Type | Workflow | Results | Documentation |
-|-----------|----------|---------|---------------|
-| Direct Runner Control | `test-runner-connectivity.yml` | ✅ ALL PASSED | [Run #17649598526](https://github.com/josecelano/test-docker-install-inside-vm-in-runner/actions/runs/17649598526/job/50156726426) |
-| VM Environment Baseline | `test-docker-standard-apt.yml` | ❌ Network failures | [Documented issues](docs/network-connectivity-issues.md) |
-| Platform Limitation | `test-ping-limitation.yml` | ✅ Confirmed ICMP blocking | [Run #17649572799](https://github.com/josecelano/test-docker-install-inside-vm-in-runner/actions/runs/17649572799/job/50156646312) |
+| Test Type               | Workflow                       | Results                    | Documentation                                                                                                                      |
+| ----------------------- | ------------------------------ | -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| Direct Runner Control   | `test-runner-connectivity.yml` | ✅ ALL PASSED              | [Run #17649598526](https://github.com/josecelano/test-docker-install-inside-vm-in-runner/actions/runs/17649598526/job/50156726426) |
+| VM Environment Baseline | `test-docker-standard-apt.yml` | ❌ Network failures        | [Documented issues](docs/network-connectivity-issues.md)                                                                           |
+| Platform Limitation     | `test-ping-limitation.yml`     | ✅ Confirmed ICMP blocking | [Run #17649572799](https://github.com/josecelano/test-docker-install-inside-vm-in-runner/actions/runs/17649572799/job/50156646312) |
 
 ## Documented Issues
 
