@@ -1,0 +1,89 @@
+# Test Docker Installation - Standard APT Method
+#
+# This workflow demonstrates Docker installation issues in VMs on GitHub shared runners
+# using the standard Ubuntu package manager (apt) installation method.
+#
+# Purpose: Baseline test case to reproduce network connectivity issues
+# Method: Standard Docker CE installation following official Docker documentation
+# Expected Result: Network timeouts and installation failures
+#
+# This serves as the baseline against which alternative installation methods
+# will be compared in future workflows.
+#
+# Related Issues:
+# - https://github.com/actions/runner-images/issues/1187
+# - Network connectivity problems with Ubuntu repositories and Docker registry
+#
+# Documentation: docs/network-connectivity-issues.md
+
+name: Test Docker Standard APT Installation
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  docker-standard-apt:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install LXD
+        run: ./scripts/install-lxd.sh
+
+      - name: Launch LXD VM
+        run: ./scripts/launch-vm.sh
+
+      - name: Wait for VM to be ready
+        run: ./scripts/wait-for-vm.sh
+
+      - name: Test basic VM functionality
+        run: ./scripts/test-vm-basic.sh
+
+      - name: Network connectivity diagnostics
+        run: ./scripts/network-diagnostics.sh
+
+      - name: Install Docker inside VM
+        run: |
+          echo "=== Installing Docker inside VM ==="
+
+          # Update package manager and install prerequisites
+          echo "--- Updating package manager ---"
+          sudo lxc exec test-vm -- bash -c "apt-get update -y"
+
+          echo "--- Installing prerequisites ---"
+          sudo lxc exec test-vm -- bash -c "apt-get install -y ca-certificates curl gnupg lsb-release"
+
+          # Add Docker's official GPG key
+          echo "--- Adding Docker GPG key ---"
+          sudo lxc exec test-vm -- bash -c "install -m 0755 -d /etc/apt/keyrings"
+          sudo lxc exec test-vm -- bash -c "curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc"
+          sudo lxc exec test-vm -- bash -c "chmod a+r /etc/apt/keyrings/docker.asc"
+
+          # Add the Docker repository to Apt sources
+          echo "--- Adding Docker repository ---"
+          sudo lxc exec test-vm -- bash -c 'echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null'
+
+          # Update package index again
+          echo "--- Updating package index with Docker repository ---"
+          sudo lxc exec test-vm -- bash -c "apt-get update -y"
+
+          # Install Docker packages
+          echo "--- Installing Docker packages ---"
+          sudo lxc exec test-vm -- bash -c "apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin"
+
+          echo "Docker installation completed!"
+
+      - name: Verify Docker installation
+        run: ./scripts/verify-docker.sh
+
+      - name: Docker installation diagnostics
+        if: always()
+        run: ./scripts/docker-diagnostics.sh
+
+      - name: Stop and delete VM
+        if: always()
+        run: ./scripts/cleanup-vm.sh
