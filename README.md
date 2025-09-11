@@ -10,15 +10,19 @@ This repository investigated **network connectivity failures** when running virt
 
 ## 🔍 **Key Discovery**: Different Network Policies for VMs vs Containers
 
-**Successful Test**: [Docker-in-Docker workflow completed successfully](https://github.com/josecelano/test-docker-install-inside-vm-in-runner/actions/runs/17651858372/job/50164731103)
+**Successful Tests**:
 
-### ✅ **What Works**: Docker-in-Docker
+- [Docker-in-Docker Build-time Installation](https://github.com/josecelano/test-docker-install-inside-vm-in-runner/actions/runs/17651858372/job/50164731103) ✅
+- [Docker-in-Docker Runtime Installation](https://github.com/josecelano/test-docker-install-inside-vm-in-runner/actions/runs/17652148460/job/50165698210) ✅
+
+### ✅ **What Works**: Docker-in-Docker (Both Installation Methods)
 
 - **Full network connectivity** from inside containers
 - **Package manager operations** (apt-get update/install work perfectly)
 - **Docker Hub access** (pull/push operations successful)
 - **Container building** inside Docker-in-Docker
 - **All standard development workflows** function normally
+- **Multiple installation approaches** validated (build-time + runtime)
 
 ### ❌ **What Doesn't Work**: Virtual Machines (LXD)
 
@@ -39,21 +43,43 @@ This repository investigated **network connectivity failures** when running virt
 - Network policies are designed for runner processes and containers, not nested VMs
 - Azure infrastructure treats container networking differently than VM networking
 
-## 🛠️ **Working Solution**: Docker-in-Docker
+## 🛠️ **Working Solution**: Docker-in-Docker (Multiple Methods)
 
 Instead of using virtual machines, use **Docker-in-Docker** for containerized development environments:
 
+### **Method 1: Build-time Installation (Faster)**
+
 ```bash
-# Build our Docker-in-Docker image
+# Build Docker-in-Docker image (Docker pre-installed)
 docker build -f docker/Dockerfile.dind -t dev-environment docker/
 
 # Run privileged container with Docker daemon
 docker run -d --privileged --name dev-container dev-environment
 
-# Use the container for development
+# Use immediately - Docker is ready
 docker exec dev-container docker pull ubuntu:24.04
 docker exec dev-container docker run --rm ubuntu:24.04 echo "It works!"
 ```
+
+### **Method 2: Runtime Installation (More Flexible)**
+
+```bash
+# Build base Ubuntu image
+docker build -f docker/Dockerfile.runtime -t ubuntu-base docker/
+
+# Run container and install Docker at runtime
+docker run -d --privileged --name dev-container ubuntu-base sleep infinity
+docker cp docker/install-docker-runtime.sh dev-container:/usr/local/bin/
+docker exec dev-container /usr/local/bin/install-docker-runtime.sh
+
+# Use after installation completes
+docker exec dev-container docker pull ubuntu:24.04
+```
+
+**Both methods provide identical functionality** - choose based on your needs:
+
+- **Build-time**: Faster startup, production CI/CD
+- **Runtime**: Dynamic configuration, debugging visibility
 
 ## Project Goals
 
@@ -87,25 +113,35 @@ docker exec dev-container docker run --rm ubuntu:24.04 echo "It works!"
 ## Repository Structure
 
 ```text
-├── README.md                           # This documentation
-├── .github/workflows/                  # Test workflows for different installation methods
-│   ├── test-docker-standard-apt.yml   # Baseline: Standard Docker apt installation in VM
-│   ├── test-runner-connectivity.yml   # Control: Network tests directly on runner
-│   ├── test-ping-limitation.yml       # Platform test: Demonstrates ICMP blocking
-│   └── test-docker-ipv4-fix.yml       # Solution test: IPv4 networking fix for VMs
+├── README.md                            # This documentation
+├── .github/workflows/                   # Test workflows for different installation methods
+│   ├── test-docker-standard-apt.yml    # Baseline: Standard Docker apt installation in VM
+│   ├── test-runner-connectivity.yml    # Control: Network tests directly on runner
+│   ├── test-ping-limitation.yml        # Platform test: Demonstrates ICMP blocking
+│   ├── test-docker-ipv4-fix.yml        # Solution test: IPv4 networking fix for VMs
+│   ├── test-docker-in-docker.yml       # ✅ Working: Docker-in-Docker build-time installation
+│   └── test-docker-runtime-install.yml # ✅ Working: Docker-in-Docker runtime installation
+├── docker/                             # Docker-in-Docker solution files
+│   ├── Dockerfile.dind                 # ✅ Build-time Docker installation
+│   ├── Dockerfile.runtime              # ✅ Base Ubuntu for runtime installation
+│   ├── install-docker-runtime.sh       # ✅ Runtime Docker installation script
+│   └── supervisord.conf                # Docker daemon configuration
 ├── scripts/                            # Reusable installation and diagnostic scripts
-│   ├── install-lxd.sh                 # LXD installation and configuration
-│   ├── configure-ipv4-networking.sh   # IPv4-only network configuration for VMs
-│   ├── launch-vm.sh                   # VM creation with configurable parameters
-│   ├── wait-for-vm.sh                 # VM readiness checking with timeout
-│   ├── test-vm-basic.sh               # Basic VM functionality tests
-│   ├── network-diagnostics.sh         # Network connectivity diagnostics
-│   ├── verify-docker.sh               # Docker installation verification
-│   ├── docker-diagnostics.sh          # Docker troubleshooting diagnostics
-│   ├── cleanup-vm.sh                  # VM cleanup and resource management
-│   └── README.md                      # Scripts documentation and usage
-└── docs/                              # Detailed documentation and findings
-    ├── network-connectivity-issues.md # Documented network failures and analysis
+│   ├── install-lxd.sh                  # LXD installation and configuration
+│   ├── configure-ipv4-networking.sh    # IPv4-only network configuration for VMs
+│   ├── launch-vm.sh                    # VM creation with configurable parameters
+│   ├── wait-for-vm.sh                  # VM readiness checking with timeout
+│   ├── test-vm-basic.sh                # Basic VM functionality tests
+│   ├── network-diagnostics.sh          # Network connectivity diagnostics
+│   ├── verify-docker.sh                # Docker installation verification
+│   ├── docker-diagnostics.sh           # Docker troubleshooting diagnostics
+│   ├── cleanup-vm.sh                   # VM cleanup and resource management
+│   └── README.md                       # Scripts documentation and usage
+└── docs/                               # Detailed documentation and findings
+    ├── network-connectivity-issues.md  # Documented network failures and analysis
+    ├── solution-docker-in-docker.md    # ✅ Complete Docker-in-Docker solution guide
+    ├── runtime-installation-test.md    # ✅ Runtime installation test results
+    └── architectural-findings.md        # Root cause analysis and conclusions
     └── solutions/                     # Solution research and implementation
         ├── README.md                  # Solutions documentation overview
         └── 01-ipv6-connectivity-fix.md # IPv6/IPv4 networking investigation

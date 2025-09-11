@@ -132,11 +132,32 @@ docker exec dev-container docker pull my-app  # ✅ Success
 
 **Recommendation**: Use Docker-in-Docker for all containerized development needs on GitHub runners instead of attempting VM-based solutions.
 
+## ✅ **CONFIRMED: Multiple Installation Methods Available**
+
+**Build-time Installation** (Original): [Successful test run](https://github.com/josecelano/test-docker-install-inside-vm-in-runner/actions/runs/17651858372/job/50164731103)
+
+**Runtime Installation** (New): [Successful test run](https://github.com/josecelano/test-docker-install-inside-vm-in-runner/actions/runs/17652148460/job/50165698210) ✅
+
+Both approaches work identically and provide the same functionality. Choose based on your use case:
+
+- **Build-time**: Faster startup (Docker pre-installed)
+- **Runtime**: Better debugging visibility and dynamic configuration
+
 ## Files and Resources
+
+### Build-time Installation (Original Solution)
 
 - **Dockerfile**: `docker/Dockerfile.dind` - Ready-to-use Ubuntu 24.04 + Docker
 - **Configuration**: `docker/supervisord.conf` - Docker daemon management
 - **Workflow**: `.github/workflows/test-docker-in-docker.yml` - Complete test suite
 - **Results**: [Successful test run](https://github.com/josecelano/test-docker-install-inside-vm-in-runner/actions/runs/17651858372/job/50164731103)
 
-**Status**: ✅ **SOLVED** - Production ready Docker-in-Docker solution available!
+### Runtime Installation (Alternative Solution)
+
+- **Base Dockerfile**: `docker/Dockerfile.runtime` - Ubuntu 24.04 base image
+- **Installation Script**: `docker/install-docker-runtime.sh` - Runtime Docker installation
+- **Workflow**: `.github/workflows/test-docker-runtime-install.yml` - Runtime test suite
+- **Documentation**: `docs/runtime-installation-test.md` - Complete guide
+- **Results**: [Successful test run](https://github.com/josecelano/test-docker-install-inside-vm-in-runner/actions/runs/17652148460/job/50165698210)
+
+**Status**: ✅ **SOLVED** - Multiple Docker-in-Docker installation methods validated and production-ready!

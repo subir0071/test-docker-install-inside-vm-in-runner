@@ -18,7 +18,7 @@ name: Test Docker-in-Docker Runtime Installation
 # - Validates complete Docker installation workflow
 #
 # References:
-# - docs/SOLUTION-docker-in-docker.md (build-time installation success)
+# - docs/solution-docker-in-docker.md (build-time installation success)
 # - Comparison test to understand installation vs runtime differences
 
 on:
