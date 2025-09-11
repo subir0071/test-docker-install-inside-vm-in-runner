@@ -105,6 +105,19 @@ jobs:
         run: |
           echo "=== IPv4 Network Connectivity Tests ==="
 
+          echo "--- Testing basic connectivity ---"
+          echo "Ping gateway (should work):"
+          sudo lxc exec test-vm -- bash -c "ping -c 3 10.0.0.1" || true
+
+          echo "Ping GitHub DNS (should work if routing is correct):"
+          sudo lxc exec test-vm -- bash -c "ping -c 3 8.8.8.8" || true
+
+          echo "--- Force IPv4 connectivity tests ---"
+          echo "Testing with forced IPv4 (-4 flag):"
+          sudo lxc exec test-vm -- bash -c "curl -4 -I --connect-timeout 5 --max-time 10 http://httpbin.org/get" || true
+          sudo lxc exec test-vm -- bash -c "curl -4 -I --connect-timeout 5 --max-time 10 http://archive.ubuntu.com" || true
+          sudo lxc exec test-vm -- bash -c "curl -4 -I --connect-timeout 5 --max-time 10 https://download.docker.com" || true
+
           echo "--- Testing external connectivity ---"
           sudo lxc exec test-vm -- bash -c "curl -I --connect-timeout 10 --max-time 30 http://httpbin.org/get" || true
           sudo lxc exec test-vm -- bash -c "curl -I --connect-timeout 10 --max-time 30 http://archive.ubuntu.com" || true
@@ -114,13 +127,44 @@ jobs:
           sudo lxc exec test-vm -- bash -c "nslookup archive.ubuntu.com" || true
           sudo lxc exec test-vm -- bash -c "nslookup download.docker.com" || true
 
+          echo "--- Network configuration debugging ---"
+          echo "VM routing table:"
+          sudo lxc exec test-vm -- bash -c "ip route show" || true
+
+          echo "VM network interfaces:"
+          sudo lxc exec test-vm -- bash -c "ip addr show" || true
+
+          echo "Host routing (for comparison):"
+          ip route show | head -5
+
+          echo "Host network interfaces (for comparison):"
+          ip addr show | grep -E "inet |UP" | head -10
+
+          echo "--- LXD network configuration debugging ---"
+          echo "LXD bridge configuration:"
+          lxc network show lxdbr0
+
+          echo "--- Testing NAT/forwarding from host ---"
+          echo "Testing if host can reach external sites:"
+          curl -I --connect-timeout 5 --max-time 10 http://httpbin.org/get || true
+
       - name: Install Docker inside VM (The Main Test)
         run: |
           echo "=== Installing Docker inside VM with IPv4 networking ==="
           echo "This is the main test - if IPv4 fixes our issue, this should succeed"
 
+          # Configure APT to prefer IPv4
+          echo "--- Configuring APT for IPv4 only ---"
+          sudo lxc exec test-vm -- bash -c "echo 'Acquire::ForceIPv4 \"true\";' > /etc/apt/apt.conf.d/99force-ipv4"
+
+          # Alternative: Try to disable IPv6 completely in the VM
+          echo "--- Attempting to disable IPv6 in VM ---"
+          sudo lxc exec test-vm -- bash -c "echo 'net.ipv6.conf.all.disable_ipv6 = 1' >> /etc/sysctl.conf"
+          sudo lxc exec test-vm -- bash -c "echo 'net.ipv6.conf.default.disable_ipv6 = 1' >> /etc/sysctl.conf"
+          sudo lxc exec test-vm -- bash -c "sysctl -p" || true
+
           # Update package manager
-          echo "--- Updating package manager ---"
+          echo "--- Updating package manager with IPv4 configuration ---"
           time sudo lxc exec test-vm -- bash -c "apt-get update -y"
 
           echo "--- Installing prerequisites ---"
@@ -129,7 +173,7 @@ jobs:
           # Add Docker's official GPG key
           echo "--- Adding Docker GPG key ---"
           sudo lxc exec test-vm -- bash -c "install -m 0755 -d /etc/apt/keyrings"
-          time sudo lxc exec test-vm -- bash -c "curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc"
+          time sudo lxc exec test-vm -- bash -c "curl -4 -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc"
           sudo lxc exec test-vm -- bash -c "chmod a+r /etc/apt/keyrings/docker.asc"
 
           # Add the Docker repository
