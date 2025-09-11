@@ -18,6 +18,14 @@ This document captures specific network connectivity issues encountered when run
 
 **Reference**: [GitHub Actions Issue #1519](https://github.com/actions/runner-images/issues/1519#issuecomment-683790054)
 
+**Confirmed Test Results** (September 11, 2025):
+
+- **Workflow**: `test-ping-limitation.yml`
+- **Result**: ✅ **CONFIRMED** - All ping commands failed, HTTP/HTTPS worked perfectly
+- **Run URL**: [Actions Run #17649572799](https://github.com/josecelano/test-docker-install-inside-vm-in-runner/actions/runs/17649572799/job/50156646312)
+- **Ping timing**: 12-14 seconds per ping test (timeout behavior)
+- **HTTP timing**: 0-4 seconds per HTTP test (normal performance)
+
 **Solution**: Our testing framework uses `curl` with HTTP/HTTPS requests for connectivity testing instead of ping.
 
 ## Control Test Results - Direct GitHub Runner
@@ -33,7 +41,7 @@ The direct GitHub runner connectivity test completed successfully, demonstrating
 
 - **✅ Package manager operations work**: `apt-get update` completed successfully
 - **✅ External repository access works**: Docker and Microsoft repositories accessible
-- **✅ Package installations work**: Development packages install without issues  
+- **✅ Package installations work**: Development packages install without issues
 - **✅ Docker operations work**: Docker Hub connectivity and container operations successful
 - **✅ Network performance is good**: HTTP/HTTPS requests complete within expected timeframes
 - **✅ Multiple concurrent connections work**: Parallel requests to different hosts succeed
@@ -50,7 +58,7 @@ The direct GitHub runner connectivity test completed successfully, demonstrating
 **The network connectivity issues are VM-specific**, not GitHub runner infrastructure problems. This isolates the problem to:
 
 - LXD networking configuration
-- VM-to-host network routing  
+- VM-to-host network routing
 - Nested virtualization network limitations
 - VM network interface configuration
 

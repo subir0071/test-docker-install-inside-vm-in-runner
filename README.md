@@ -66,8 +66,9 @@ GitHub shared runners are known to have networking issues that can cause flaky b
 - **Control test workflow**: Tests network connectivity directly on GitHub runner
 - **✅ Root cause identified**: Network issues are **VM-specific**, not runner infrastructure problems
 - **Control test results**: Direct runner connectivity tests **ALL PASSED** (September 11, 2025)
-- **Ping limitation discovery**: Confirmed ICMP is blocked in GitHub shared runners (Azure design)
-- **Refactored connectivity tests**: Replaced ping with HTTP-based connectivity testing
+- **✅ Ping limitation confirmed**: Test workflow verified ICMP is blocked in GitHub runners (Azure design)
+- **Platform limitation results**: Ping tests failed (12-14s timeouts), HTTP tests passed (0-4s)
+- **Refactored connectivity tests**: All workflows use HTTP-based connectivity testing only
 - **Reusable scripts**: Modular components for testing different approaches
 - **Network issue documentation**: Detailed analysis of connectivity failures
 - **Diagnostic tooling**: Comprehensive logging and troubleshooting scripts
@@ -126,9 +127,10 @@ The repository includes two complementary workflows:
 
 **⚠️ ICMP/Ping Limitation**: GitHub shared runners (hosted on Azure) do not support ICMP packets by design. This means:
 
-- `ping` commands will always fail with 100% packet loss
-- This is NOT a connectivity issue - HTTP/HTTPS traffic works normally
+- `ping` commands will always fail with 100% packet loss (confirmed with 12-14s timeouts)
+- This is NOT a connectivity issue - HTTP/HTTPS traffic works normally (0-4s response times)
 - Our network diagnostics use HTTP requests instead of ping
+- ✅ **Confirmed by test**: [Ping Limitation Workflow Run](https://github.com/josecelano/test-docker-install-inside-vm-in-runner/actions/runs/17649572799/job/50156646312)
 - Reference: [GitHub Actions Issue #1519](https://github.com/actions/runner-images/issues/1519#issuecomment-683790054)
 
 ### Understanding the Test Strategy
@@ -142,13 +144,13 @@ The repository includes two complementary workflows:
 Our comparative testing revealed that:
 
 - **✅ Direct runner tests**: ALL network operations work perfectly
-- **❌ VM-based tests**: Network connectivity failures for same operations  
+- **❌ VM-based tests**: Network connectivity failures for same operations
 - **Conclusion**: Issues are caused by VM networking, not GitHub runner infrastructure
 
 This means the solution focus should be on:
 
 - LXD networking configuration
-- VM network routing optimization  
+- VM network routing optimization
 - Alternative VM networking approaches
 
 ### Using the Scripts Independently
