@@ -42,7 +42,8 @@ GitHub shared runners are known to have networking issues that can cause flaky b
 ├── README.md                           # This documentation
 ├── .github/workflows/                  # Test workflows for different installation methods
 │   ├── test-docker-standard-apt.yml   # Baseline: Standard Docker apt installation in VM
-│   └── test-runner-connectivity.yml   # Control: Network tests directly on runner
+│   ├── test-runner-connectivity.yml   # Control: Network tests directly on runner
+│   └── test-ping-limitation.yml       # Platform test: Demonstrates ICMP blocking
 ├── scripts/                            # Reusable installation and diagnostic scripts
 │   ├── install-lxd.sh                 # LXD installation and configuration
 │   ├── launch-vm.sh                   # VM creation with configurable parameters
