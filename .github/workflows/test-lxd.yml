@@ -91,11 +91,93 @@ jobs:
 
           echo "VM is ready for use!"
 
-      - name: Run command inside VM
+      - name: Test basic VM functionality
         run: |
+          echo "=== Testing basic VM functionality ==="
           sudo lxc exec test-vm -- bash -c "echo Hello from LXD VM"
+          sudo lxc exec test-vm -- bash -c "uname -a"
+          sudo lxc exec test-vm -- bash -c "cat /etc/os-release"
+
+      - name: Install Docker inside VM
+        run: |
+          echo "=== Installing Docker inside VM ==="
+
+          # Update package manager and install prerequisites
+          echo "--- Updating package manager ---"
+          sudo lxc exec test-vm -- bash -c "apt-get update -y"
+
+          echo "--- Installing prerequisites ---"
+          sudo lxc exec test-vm -- bash -c "apt-get install -y ca-certificates curl"
+
+          # Add Docker's official GPG key
+          echo "--- Adding Docker GPG key ---"
+          sudo lxc exec test-vm -- bash -c "install -m 0755 -d /etc/apt/keyrings"
+          sudo lxc exec test-vm -- bash -c "curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc"
+          sudo lxc exec test-vm -- bash -c "chmod a+r /etc/apt/keyrings/docker.asc"
+
+          # Add the Docker repository to Apt sources
+          echo "--- Adding Docker repository ---"
+          sudo lxc exec test-vm -- bash -c 'echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null'
+
+          # Update package index again
+          echo "--- Updating package index with Docker repository ---"
+          sudo lxc exec test-vm -- bash -c "apt-get update -y"
+
+          # Install Docker packages
+          echo "--- Installing Docker packages ---"
+          sudo lxc exec test-vm -- bash -c "apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin"
+
+          echo "Docker installation completed!"
+
+      - name: Verify Docker installation
+        run: |
+          echo "=== Verifying Docker installation ==="
+
+          # Check Docker version
+          echo "--- Docker version ---"
+          sudo lxc exec test-vm -- bash -c "docker --version"
+
+          # Check Docker service status
+          echo "--- Docker service status ---"
+          sudo lxc exec test-vm -- bash -c "systemctl status docker --no-pager"
+
+          # Test Docker functionality
+          echo "--- Testing Docker functionality ---"
+          sudo lxc exec test-vm -- bash -c "docker info"
+
+          echo "--- Running test container ---"
+          sudo lxc exec test-vm -- bash -c "docker run --rm hello-world"
+
+          echo "Docker verification completed successfully!"
+
+      - name: Docker installation diagnostics
+        if: always()
+        run: |
+          echo "=== Docker installation diagnostics ==="
+
+          # Check if Docker daemon is running
+          echo "--- Docker daemon process ---"
+          sudo lxc exec test-vm -- bash -c "ps aux | grep docker" || true
+
+          # Check Docker logs
+          echo "--- Docker service logs ---"
+          sudo lxc exec test-vm -- bash -c "journalctl -u docker.service --no-pager -n 50" || true
+
+          # Check available disk space
+          echo "--- Disk usage ---"
+          sudo lxc exec test-vm -- bash -c "df -h" || true
+
+          # Check memory usage
+          echo "--- Memory usage ---"
+          sudo lxc exec test-vm -- bash -c "free -h" || true
+
+          # Network connectivity test
+          echo "--- Network connectivity test ---"
+          sudo lxc exec test-vm -- bash -c "curl -I https://download.docker.com/linux/ubuntu/gpg" || true
 
       - name: Stop and delete VM
+        if: always()
         run: |
-          sudo lxc stop test-vm
-          sudo lxc delete test-vm
+          echo "=== Cleaning up VM ==="
+          sudo lxc stop test-vm || true
+          sudo lxc delete test-vm || true
