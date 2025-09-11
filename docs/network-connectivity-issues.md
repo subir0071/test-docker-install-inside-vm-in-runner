@@ -20,6 +20,40 @@ This document captures specific network connectivity issues encountered when run
 
 **Solution**: Our testing framework uses `curl` with HTTP/HTTPS requests for connectivity testing instead of ping.
 
+## Control Test Results - Direct GitHub Runner
+
+**Date**: September 11, 2025  
+**Workflow**: `test-runner-connectivity.yml`  
+**Result**: ✅ **ALL TESTS PASSED**  
+**Run URL**: [Actions Run #17649598526](https://github.com/josecelano/test-docker-install-inside-vm-in-runner/actions/runs/17649598526/job/50156726426)
+
+### Test Results Summary
+
+The direct GitHub runner connectivity test completed successfully, demonstrating that:
+
+- **✅ Package manager operations work**: `apt-get update` completed successfully
+- **✅ External repository access works**: Docker and Microsoft repositories accessible
+- **✅ Package installations work**: Development packages install without issues  
+- **✅ Docker operations work**: Docker Hub connectivity and container operations successful
+- **✅ Network performance is good**: HTTP/HTTPS requests complete within expected timeframes
+- **✅ Multiple concurrent connections work**: Parallel requests to different hosts succeed
+
+### Key Findings
+
+1. **Network connectivity is NOT a runner-wide issue**: All network operations that fail in VMs work perfectly on direct runners
+2. **Package repositories are accessible**: Ubuntu, Docker, and Microsoft repositories all respond correctly
+3. **Docker Hub connectivity is functional**: Container pulls and operations complete successfully
+4. **Performance is acceptable**: No timeout issues observed in direct runner environment
+
+### Conclusion
+
+**The network connectivity issues are VM-specific**, not GitHub runner infrastructure problems. This isolates the problem to:
+
+- LXD networking configuration
+- VM-to-host network routing  
+- Nested virtualization network limitations
+- VM network interface configuration
+
 ## Testing Methodology
 
 We use three complementary approaches to isolate the source of network issues:
@@ -30,8 +64,8 @@ We use three complementary approaches to isolate the source of network issues:
 
 This comparison helps determine if issues are:
 
-- **VM-specific**: Problems only occur in virtualized environments
-- **Runner-wide**: Problems affect the GitHub runner infrastructure generally
+- **VM-specific**: Problems only occur in virtualized environments ← **CONFIRMED**
+- **Runner-wide**: Problems affect the GitHub runner infrastructure generally ← **RULED OUT**
 - **Platform limitations**: Known restrictions of the GitHub runner environment
 
 ## Issue #2: Docker Registry HTTPS Connectivity Timeout

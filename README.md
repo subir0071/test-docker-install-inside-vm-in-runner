@@ -64,6 +64,8 @@ GitHub shared runners are known to have networking issues that can cause flaky b
 
 - **Baseline test workflow**: Reproduces standard Docker installation failures in VMs
 - **Control test workflow**: Tests network connectivity directly on GitHub runner
+- **✅ Root cause identified**: Network issues are **VM-specific**, not runner infrastructure problems
+- **Control test results**: Direct runner connectivity tests **ALL PASSED** (September 11, 2025)
 - **Ping limitation discovery**: Confirmed ICMP is blocked in GitHub shared runners (Azure design)
 - **Refactored connectivity tests**: Replaced ping with HTTP-based connectivity testing
 - **Reusable scripts**: Modular components for testing different approaches
@@ -72,18 +74,22 @@ GitHub shared runners are known to have networking issues that can cause flaky b
 
 ### 🔄 In Progress
 
-- Comparing VM vs direct runner network behavior
-- Testing alternative Docker installation methods
-- Developing workarounds for network connectivity issues
+- Developing VM networking solutions (LXD configuration, network routing)
+- Testing alternative Docker installation methods for VM environments
+- Creating workarounds for VM-specific network limitations
 
 ### 📋 Planned
 
-- Additional workflows testing different installation approaches:
+- VM networking fix workflows:
+  - LXD bridge configuration optimization
+  - VM network interface debugging
+  - Alternative VM networking approaches
+- Specialized VM installation workflows:
   - Retry mechanisms with exponential backoff
-  - IPv4-only configuration
+  - IPv4-only configuration for VMs
   - Snap package installation
-  - Docker convenience script installation
   - Pre-cached dependency installation
+  - Docker convenience script installation
 
 ## Documented Issues
 
@@ -130,6 +136,20 @@ The repository includes two complementary workflows:
 1. **Baseline VM Test**: Documents Docker installation failures in LXD VMs
 2. **Control Runner Test**: Tests same operations directly on GitHub runner
 3. **Comparison**: Isolates whether issues are VM-specific or runner-wide
+
+### ✅ Key Discovery: Issues Are VM-Specific
+
+Our comparative testing revealed that:
+
+- **✅ Direct runner tests**: ALL network operations work perfectly
+- **❌ VM-based tests**: Network connectivity failures for same operations  
+- **Conclusion**: Issues are caused by VM networking, not GitHub runner infrastructure
+
+This means the solution focus should be on:
+
+- LXD networking configuration
+- VM network routing optimization  
+- Alternative VM networking approaches
 
 ### Using the Scripts Independently
 
