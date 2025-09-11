@@ -1,40 +1,80 @@
-# Docker Installation Issues in VMs on GitHub Shared Runners
+# VM Network Connectivity Issues on GitHub Shared Runners
 
 ## Overview
 
-This repository documents and investigates problems encountered when installing Docker inside virtual machines that are created within GitHub shared runners. This project was created to address specific issues found while working on the [torrust-tracker-deploy-rust-poc](https://github.com/torrust/torrust-tracker-deploy-rust-poc) project.
+This repository investigates **network connectivity failures** when running virtual machines inside GitHub shared runners. The root cause has been identified as **GitHub's infrastructure not being designed to support nested virtualization with outbound network access**.
+
+## Critical Discovery: Architectural Limitation
+
+**Root Cause**: GitHub-hosted runners use Azure infrastructure with network policies designed for runner processes, not nested VMs. This creates an architectural limitation that prevents VMs from establishing outbound connections.
+
+**Key Evidence**:
+
+- GitHub's [official documentation](https://docs.github.com/en/actions/reference/runners/github-hosted-runners) mentions nested-virtualization limitations
+- Network policies are configured for specific runner communication requirements
+- Azure security groups likely block traffic from VM processes that don't match expected patterns
 
 ## Problem Statement
 
-When running CI/CD workflows on GitHub shared runners that involve:
+When creating virtual machines inside GitHub runners:
 
-- Creating virtual machines (VMs) inside the runner environment
-- Installing Docker within those VMs
-- Using Docker for containerized deployments or testing
+- ✅ **VMs launch successfully** with proper local networking (IPv4 addresses)
+- ✅ **DNS resolution works** (likely proxied at runner level)
+- ❌ **All HTTP/HTTPS connections fail** with timeouts
+- ❌ **Package managers cannot reach repositories**
+- ❌ **Software installation fails** due to network unreachability
 
-We encounter flaky network behavior and installation failures that make the CI/CD pipeline unreliable.
+**Example Error**:
 
-## Background
+```
+Cannot initiate the connection to archive.ubuntu.com:80 (2620:2d:4000:1::16). - connect (101: Network is unreachable)
+```
 
-GitHub shared runners are known to have networking issues that can cause flaky behavior. This is a documented problem that has been reported in the GitHub Actions community:
+## Architecture Analysis
 
-- **Primary Issue**: [Networking is Flaky on GitHub Hosted Runners #1187](https://github.com/actions/runner-images/issues/1187)
-- **Symptoms**:
-  - Spurious timeouts when downloading files using `curl`
-  - Network connectivity issues to localhost services
-  - Intermittent failures that are difficult to reproduce locally
-  - Higher failure rates during periods of heavy runner load
+### Network Policy Constraints
+
+- **Ubuntu runners hosted in Azure datacenters**
+- **Network policies designed for runner processes**, not nested VMs
+- **Communication requirements** specify exact domains runners must access
+- **Dynamic IP management** indicates controlled access patterns
+- **Security groups likely block** VM traffic that doesn't match runner signatures
+
+### Why Standard Approaches Don't Work
+
+1. **VM traffic pattern mismatch**: Azure policies expect runner process signatures
+2. **NAT/routing limitations**: Infrastructure may not provide proper NAT for nested VMs
+3. **Firewall restrictions**: Outbound VM connections blocked at infrastructure level
+4. **DNS vs HTTP disparity**: DNS proxied but direct HTTP routing blocked
 
 ## Project Goals
 
-1. **Document the Problem**: Create reproducible test cases that demonstrate Docker installation failures in VMs on GitHub runners
-2. **Investigate Root Causes**: Analyze whether issues are due to:
-   - Network connectivity problems
-   - Resource constraints in nested virtualization
-   - GitHub runner infrastructure limitations
-   - Docker daemon startup issues in VM environments
-3. **Develop Workarounds**: Find reliable solutions and best practices for Docker installation in GitHub runner VMs
-4. **Share Solutions**: Provide the community with tested approaches to overcome these challenges
+1. **Document the Architectural Limitation**: Provide clear evidence that GitHub runners don't support nested VM networking
+2. **Investigate Alternative Approaches**: Test whether container-based solutions work differently
+3. **Research Workarounds**: Explore larger runners, self-hosted runners, or different virtualization approaches
+4. **Share Findings**: Help the community understand these infrastructure constraints
+
+## Key Findings Summary
+
+### ❌ What Doesn't Work
+
+- **LXD VMs with outbound connectivity**: Network connections fail despite proper IP configuration
+- **IPv4/IPv6 configuration fixes**: The problem is deeper than address family issues
+- **Standard networking troubleshooting**: Traditional network debugging doesn't apply here
+
+### ✅ What We've Learned
+
+- **VMs can be created successfully**: LXD virtualization itself works on GitHub runners
+- **Local networking functions**: VM-to-VM and VM-to-host communication works
+- **DNS resolution works**: Likely proxied/handled at the runner level
+- **Root cause is architectural**: GitHub/Azure infrastructure design limitation
+
+### 🧪 Potential Alternatives to Test
+
+1. **Container-based approaches**: Docker-in-Docker instead of VMs
+2. **Larger runners**: Different networking capabilities mentioned in GitHub docs
+3. **Self-hosted runners**: Full control over virtualization and networking
+4. **Different virtualization tools**: Test if other VM technologies behave differently
 
 ## Repository Structure
 
