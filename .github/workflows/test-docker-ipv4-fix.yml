@@ -146,6 +146,8 @@ jobs:
           sudo iptables -t nat -L POSTROUTING -n -v
           echo "outbound firewall rules:"
           sudo ufw status verbose
+          echo "===== Check if default route missing inside VM ====="
+          sudo lxc exec test-vm -- ip route
       - name: "Add masquerade rule for lxd"
         run: |
           echo "=== Adding masquerade rule for lxdbr0 ==="
