@@ -106,7 +106,11 @@ jobs:
       - name: "Add masquerade rule for lxd"
         run: |
           echo "=== Adding masquerade rule for lxdbr0 ==="
-          sudo iptables -t nat -A POSTROUTING -s 10.0.0.0/24 -o eth0 -j MASQUERADE
+          lxc network set lxdbr0 ipv4.address 10.42.42.1/24
+          lxc network set lxdbr0 ipv4.nat true
+          lxc network unset lxdbr0 ipv4.dhcp.ranges  # Clear existing DHCP range
+          lxc network reload lxdbr0
+          sudo iptables -t nat -A POSTROUTING -s 10.42.42.0/24 -o eth0 -j MASQUERADE
           echo "Verifying masquerade rule added:"
           sudo iptables -t nat -L POSTROUTING -n -v
 
