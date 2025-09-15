@@ -109,7 +109,13 @@ jobs:
           lxc network set lxdbr0 ipv4.address 10.42.42.1/24
           lxc network set lxdbr0 ipv4.nat true
           lxc network unset lxdbr0 ipv4.dhcp.ranges  # Clear existing DHCP range
-          lxc network reload lxdbr0
+          lxc stop test-vm
+          lxc network disable lxdbr0
+          lxc network enable lxdbr0
+          lxc network show lxdbr0
+          lxc start test-vm
+          sleep 10
+          lxc exec test-vm -- ip a
           sudo iptables -t nat -A POSTROUTING -s 10.42.42.0/24 -o eth0 -j MASQUERADE
           echo "Verifying masquerade rule added:"
           sudo iptables -t nat -L POSTROUTING -n -v
