@@ -153,6 +153,12 @@ jobs:
           echo "Verifying masquerade rule added:"
           sudo iptables -t nat -L POSTROUTING -n -v
 
+      - name: "Test --- Test"
+        run: |
+          echo "=== Testing network connectivity inside VM ==="
+          sudo lxc exec test-vm -- bash -c "ping -c 3 8.8.8.8" || true
+          sudo lxc exec test-vm -- bash -c "curl -I --connect-timeout 5 --max-time 10 http://httpbin.org/get" || true
+
       - name: Install Docker inside VM (The Main Test)
         run: |
           echo "=== Installing Docker inside VM with IPv4 networking ==="
