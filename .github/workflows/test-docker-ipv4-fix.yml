@@ -110,9 +110,18 @@ jobs:
           lxc network set lxdbr0 ipv4.nat true
           lxc network unset lxdbr0 ipv4.dhcp.ranges  # Clear existing DHCP range
           lxc stop test-vm
-          lxc network disable lxdbr0
-          lxc network enable lxdbr0
-          lxc network show lxdbr0
+          lxc network delete lxdbr0
+          lxc network create lxdbr0 \
+            ipv4.address=10.42.42.1/24 \
+            ipv4.nat=true \
+            ipv6.address=none
+          lxc profile edit default
+          devices:
+            eth0:
+              name: eth0
+              nictype: bridged
+              parent: lxdbr0
+              type: nic
           lxc start test-vm
           sleep 10
           lxc exec test-vm -- ip a
