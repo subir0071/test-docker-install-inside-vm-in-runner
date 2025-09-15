@@ -138,6 +138,17 @@ jobs:
           echo "Testing if host can reach external sites:"
           curl -I --connect-timeout 5 --max-time 10 http://httpbin.org/get || true
 
+      - name: Check if IP Forwarding disabled
+        run: |
+          echo "=== Checking if IP Forwarding is disabled on host ==="
+          if sysctl net.ipv4.ip_forward | grep '= 0'; then
+            echo "✅ IP Forwarding is disabled (expected)"
+          else
+            echo "❌ IP Forwarding is enabled - this may cause issues"
+            sysctl net.ipv4.ip_forward
+            exit 1
+          fi
+
       - name: Install Docker inside VM (The Main Test)
         run: |
           echo "=== Installing Docker inside VM with IPv4 networking ==="
