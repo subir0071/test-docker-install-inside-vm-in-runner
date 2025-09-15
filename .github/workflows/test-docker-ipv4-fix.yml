@@ -91,6 +91,31 @@ jobs:
       - name: Test basic VM functionality
         run: ./scripts/test-vm-basic.sh
 
+      - name: Check if IP Forwarding disabled
+        run: |
+          echo "=== Checking if IP Forwarding is disabled on host ==="
+          sysctl net.ipv4.ip_forward 
+          echo "Check masquerade setting for lxdbr0:"
+          sudo iptables -t nat -L POSTROUTING -n -v
+          echo "outbound firewall rules:"
+          sudo ufw status verbose
+          echo "===== Check if default route missing inside VM ====="
+          sudo lxc exec test-vm -- ip route
+          echo "Check if we can reach external IP (8.8.8.8):"
+          ip route get 8.8.8.8
+      - name: "Add masquerade rule for lxd"
+        run: |
+          echo "=== Adding masquerade rule for lxdbr0 ==="
+          sudo iptables -t nat -A POSTROUTING -s 10.0.0.0/24 ! -d 10.0.0.0/24 -j MASQUERADE
+          echo "Verifying masquerade rule added:"
+          sudo iptables -t nat -L POSTROUTING -n -v
+
+      - name: "Test --- Test"
+        run: |
+          echo "=== Testing network connectivity inside VM ==="
+          sudo lxc exec test-vm -- bash -c "ping -c 3 8.8.8.8" || true
+          sudo lxc exec test-vm -- bash -c "curl -I --connect-timeout 5 --max-time 10 http://httpbin.org/get" || true
+
       - name: Network connectivity diagnostics (IPv4)
         run: |
           echo "=== IPv4 Network Connectivity Tests ==="
@@ -138,29 +163,7 @@ jobs:
           echo "Testing if host can reach external sites:"
           curl -I --connect-timeout 5 --max-time 10 http://httpbin.org/get || true
 
-      - name: Check if IP Forwarding disabled
-        run: |
-          echo "=== Checking if IP Forwarding is disabled on host ==="
-          sysctl net.ipv4.ip_forward 
-          echo "Check masquerade setting for lxdbr0:"
-          sudo iptables -t nat -L POSTROUTING -n -v
-          echo "outbound firewall rules:"
-          sudo ufw status verbose
-          echo "===== Check if default route missing inside VM ====="
-          sudo lxc exec test-vm -- ip route
-      - name: "Add masquerade rule for lxd"
-        run: |
-          echo "=== Adding masquerade rule for lxdbr0 ==="
-          sudo iptables -t nat -A POSTROUTING -s 10.0.0.0/24 ! -d 10.0.0.0/24 -j MASQUERADE
-          echo "Verifying masquerade rule added:"
-          sudo iptables -t nat -L POSTROUTING -n -v
-
-      - name: "Test --- Test"
-        run: |
-          echo "=== Testing network connectivity inside VM ==="
-          sudo lxc exec test-vm -- bash -c "ping -c 3 8.8.8.8" || true
-          sudo lxc exec test-vm -- bash -c "curl -I --connect-timeout 5 --max-time 10 http://httpbin.org/get" || true
-
+     
       - name: Install Docker inside VM (The Main Test)
         run: |
           echo "=== Installing Docker inside VM with IPv4 networking ==="
