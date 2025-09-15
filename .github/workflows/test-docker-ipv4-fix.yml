@@ -142,7 +142,10 @@ jobs:
         run: |
           echo "=== Checking if IP Forwarding is disabled on host ==="
           sysctl net.ipv4.ip_forward 
-
+          echo "Check masquerade setting for lxdbr0:"
+          sudo iptables -t nat -L POSTROUTING -n -v
+          echo "outbound firewall rules:"
+          sudo ufw status verbose
       - name: Install Docker inside VM (The Main Test)
         run: |
           echo "=== Installing Docker inside VM with IPv4 networking ==="
